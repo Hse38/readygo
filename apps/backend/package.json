@@ -11,7 +11,11 @@
     "prisma:migrate": "prisma migrate dev --schema=src/prisma/schema.prisma",
     "prisma:studio": "prisma studio --schema=src/prisma/schema.prisma"
   },
-  "keywords": ["readygo", "express", "typescript"],
+  "keywords": [
+    "readygo",
+    "express",
+    "typescript"
+  ],
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
