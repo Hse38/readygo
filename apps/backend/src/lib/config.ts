@@ -24,6 +24,12 @@ export const config = {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID ?? "",
   },
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY ?? "",
+  },
+  googleMaps: {
+    apiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+  },
 } as const;
 
 export { requireEnv };

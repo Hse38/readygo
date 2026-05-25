@@ -14,6 +14,7 @@
   "keywords": ["readygo", "express", "typescript"],
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.9.0",
     "apple-signin-auth": "^1.7.6",
     "cors": "^2.8.5",

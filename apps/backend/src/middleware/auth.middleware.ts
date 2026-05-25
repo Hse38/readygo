@@ -11,7 +11,7 @@ export function authMiddleware(
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith("Bearer ")) {
-    res.status(401).json({ success: false, error: "Unauthorized" });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
@@ -22,6 +22,6 @@ export function authMiddleware(
     req.user = { id: decoded.userId, email: decoded.email };
     next();
   } catch {
-    res.status(401).json({ success: false, error: "Invalid or expired token" });
+    res.status(401).json({ error: "Unauthorized" });
   }
 }

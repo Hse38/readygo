@@ -8,29 +8,36 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  name           String?
-  surname        String?
-  occupation     String?
-  workLocation   String?
-  workDays       String[]
-  transportMode  String?
-  morningAlarm   String?
-  createdAt      DateTime @default(now())
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String?
+  surname          String?
+  occupation       String?
+  workLocation     String?
+  workLocationLat  Float?
+  workLocationLng  Float?
+  homeLocation     String?
+  homeLocationLat  Float?
+  homeLocationLng  Float?
+  workDays         String[]
+  transportMode    String?
+  morningAlarm     Boolean?
+  createdAt        DateTime @default(now())
 
   events Event[]
 }
 
 model Event {
-  id          String   @id @default(cuid())
-  userId      String
-  title       String
-  type        String
-  date        DateTime
-  location    String?
-  travelMode  String?
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  type         String
+  date         DateTime
+  location     String?
+  locationLat  Float?
+  locationLng  Float?
+  travelMode   String?
+  createdAt    DateTime @default(now())
 
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   checklistItems ChecklistItem[]
