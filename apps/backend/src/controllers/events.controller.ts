@@ -9,6 +9,8 @@ import type {
   EventDetailResponse,
   EventWithChecklist,
   EventsListResponse,
+  UpdateChecklistItemBody,
+  UpdateChecklistItemResponse,
 } from "../types/events.types";
 
 type EventWithItems = Event & { checklistItems: ChecklistItem[] };
@@ -271,9 +273,63 @@ export async function getEventChecklist(
   }
 }
 
+function validateUpdateChecklistBody(body: unknown): UpdateChecklistItemBody | null {
+  if (!body || typeof body !== "object") return null;
+  const data = body as Record<string, unknown>;
+  if (typeof data.isCompleted !== "boolean") return null;
+  return { isCompleted: data.isCompleted };
+}
+
 export async function updateChecklistItem(
-  _req: Request,
+  req: Request<{ itemId: string }, object, UpdateChecklistItemBody>,
   res: Response
 ): Promise<void> {
-  res.status(501).json({ error: "Not implemented" });
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const itemId = getRouteParam(req.params.itemId);
+    if (!itemId) {
+      res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+
+    const body = validateUpdateChecklistBody(req.body);
+    if (!body) {
+      res.status(400).json({ error: "Missing required fields" });
+      return;
+    }
+
+    const existing = await prisma.checklistItem.findUnique({
+      where: { id: itemId },
+      include: { event: { select: { userId: true } } },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "Checklist item not found" });
+      return;
+    }
+
+    if (existing.event.userId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const item = await prisma.checklistItem.update({
+      where: { id: itemId },
+      data: { isCompleted: body.isCompleted },
+    });
+
+    const response: UpdateChecklistItemResponse = {
+      item: toChecklistItem(item),
+    };
+
+    res.json(response);
+  } catch (err) {
+    console.error("Update checklist item error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 }

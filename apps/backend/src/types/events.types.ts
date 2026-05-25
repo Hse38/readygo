@@ -29,6 +29,14 @@ export interface ChecklistItemResponse {
   scheduledAt: Date | null;
 }
 
+export interface UpdateChecklistItemBody {
+  isCompleted: boolean;
+}
+
+export interface UpdateChecklistItemResponse {
+  item: ChecklistItemResponse;
+}
+
 export interface EventWithChecklist {
   id: string;
   userId: string;
