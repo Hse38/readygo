@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "Event" ADD COLUMN "locationLat" DOUBLE PRECISION,
-ADD COLUMN "locationLng" DOUBLE PRECISION;
