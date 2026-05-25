@@ -1,0 +1,16 @@
+{
+  "name": "readygo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "cd apps/mobile && npm start",
+    "dev:backend": "cd apps/backend && npm run dev",
+    "dev": "concurrently \"npm run dev:mobile\" \"npm run dev:backend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
