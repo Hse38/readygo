@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "readygo",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.readygo.app"
