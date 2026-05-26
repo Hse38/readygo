@@ -7,6 +7,9 @@
     "icon": "./assets/icon.png",
     "scheme": "readygo",
     "userInterfaceStyle": "light",
+    "install": {
+      "exclude": ["react-native-reanimated", "react-native-worklets"]
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.readygo.app"
