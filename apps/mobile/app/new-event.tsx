@@ -17,8 +17,13 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import type { User } from "../constants/types";
+import type { ChecklistItem, Event, User } from "../constants/types";
 import { apiFetch } from "../lib/api";
+import {
+  requestPermissions,
+  scheduleChecklistNotifications,
+  scheduleLeaveHomeNotification,
+} from "../lib/notifications";
 import { getToken, getUser } from "../lib/storage";
 
 const PRIMARY = "#AFA9EC";
@@ -74,9 +79,12 @@ type FormData = {
 };
 
 type CreateEventResponse = {
-  event: {
-    id: string;
-  };
+  event: Event;
+  checklistItems: ChecklistItem[];
+};
+
+type TravelTimeResponse = {
+  departureTime: string;
 };
 
 function isUser(value: object | null): value is User {
@@ -260,6 +268,44 @@ export default function NewEventScreen() {
         },
         token
       );
+
+      const granted = await requestPermissions();
+      if (granted) {
+        await scheduleChecklistNotifications(response.event, response.checklistItems);
+
+        const storedUser = await getUser();
+        const user = isUser(storedUser) ? storedUser : null;
+        const origin = user?.homeLocation?.trim();
+        const destination = response.event.location?.trim();
+
+        if (origin && destination) {
+          try {
+            const params = new URLSearchParams({
+              origin,
+              destination,
+              mode:
+                response.event.travelMode ??
+                user?.transportMode ??
+                "driving",
+              eventTime: response.event.date,
+            });
+
+            const travel = await apiFetch<TravelTimeResponse>(
+              `/travel-time?${params.toString()}`,
+              {},
+              token
+            );
+
+            await scheduleLeaveHomeNotification(
+              response.event.id,
+              travel.departureTime,
+              response.event.title
+            );
+          } catch {
+            // Travel notification is optional if the API call fails.
+          }
+        }
+      }
 
       router.replace(`/event/${response.event.id}`);
     } catch (err) {

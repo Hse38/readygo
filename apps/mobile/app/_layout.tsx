@@ -1,12 +1,19 @@
 import "react-native-gesture-handler";
 import "../global.css";
 
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+import {
+  configureNotificationHandler,
+  getEventIdFromNotification,
+} from "../lib/notifications";
 import { getToken, getUser } from "../lib/storage";
+
+configureNotificationHandler();
 
 export default function RootLayout() {
   const router = useRouter();
@@ -33,6 +40,28 @@ export default function RootLayout() {
 
     checkAuth();
   }, [router]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    function navigateToEvent(eventId: string) {
+      router.push(`/event/${eventId}`);
+    }
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const eventId = getEventIdFromNotification(response);
+      if (eventId) navigateToEvent(eventId);
+    });
+
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const eventId = getEventIdFromNotification(response);
+        if (eventId) navigateToEvent(eventId);
+      });
+
+    return () => subscription.remove();
+  }, [isLoading, router]);
 
   if (isLoading) {
     return (
