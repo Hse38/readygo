@@ -1,9 +1,10 @@
 import * as AppleAuthentication from "expo-apple-authentication";
-import { exchangeCodeAsync, makeRedirectUri } from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,18 +16,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
-  GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_ID_ANDROID,
   GOOGLE_CLIENT_ID_IOS,
+  GOOGLE_WEB_CLIENT_ID,
 } from "../constants/config";
 import type { User } from "../constants/types";
 import { apiFetch } from "../lib/api";
 import { getToken, getUser, saveToken, saveUser } from "../lib/storage";
 
-WebBrowser.maybeCompleteAuthSession();
-
 const PRIMARY = "#AFA9EC";
-const redirectUri = makeRedirectUri({ scheme: "readygo" });
 
 type AuthResponse = {
   token: string;
@@ -62,15 +60,10 @@ function isLocalProfile(user: object | null): user is LocalProfile {
 }
 
 function isGoogleAuthConfigured(): boolean {
+  if (!GOOGLE_WEB_CLIENT_ID) return false;
   if (Platform.OS === "android") return Boolean(GOOGLE_CLIENT_ID_ANDROID);
   if (Platform.OS === "ios") return Boolean(GOOGLE_CLIENT_ID_IOS);
-  return Boolean(GOOGLE_CLIENT_ID);
-}
-
-function getGoogleClientId(): string {
-  if (Platform.OS === "android") return GOOGLE_CLIENT_ID_ANDROID;
-  if (Platform.OS === "ios") return GOOGLE_CLIENT_ID_IOS;
-  return GOOGLE_CLIENT_ID;
+  return false;
 }
 
 export default function AuthScreen() {
@@ -94,6 +87,15 @@ export default function AuthScreen() {
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
+  }, []);
+
+  useEffect(() => {
+    if (!isGoogleAuthConfigured()) return;
+
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      ...(GOOGLE_CLIENT_ID_IOS ? { iosClientId: GOOGLE_CLIENT_ID_IOS } : {}),
+    });
   }, []);
 
   async function completeAuth(authResponse: AuthResponse) {
@@ -181,6 +183,40 @@ export default function AuthScreen() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    try {
+      setIsLoading(true);
+
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      });
+
+      const signInResult = await GoogleSignin.signIn();
+      if (signInResult.type === "cancelled") return;
+
+      const tokens = await GoogleSignin.getTokens();
+      const idToken = tokens.idToken;
+      if (!idToken) {
+        throw new Error("Google idToken alınamadı.");
+      }
+
+      const authResponse = await apiFetch<AuthResponse>("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ idToken }),
+      });
+
+      await completeAuth(authResponse);
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      if (err.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (err.code === statusCodes.IN_PROGRESS) return;
+
+      Alert.alert("Hata", "Google ile giriş yapılamadı");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   if (isCheckingToken) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-white">
@@ -225,11 +261,24 @@ export default function AuthScreen() {
           ) : null}
 
           {isGoogleAuthConfigured() ? (
-            <GoogleSignInButton
-              isLoading={isLoading}
-              setIsLoading={setIsLoading}
-              onCompleteAuth={completeAuth}
-            />
+            <Pressable
+              onPress={handleGoogleSignIn}
+              disabled={isLoading}
+              className="flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-4"
+              style={{ opacity: isLoading ? 0.7 : 1 }}
+            >
+              <Text className="mr-2 text-base font-bold">
+                <Text style={{ color: "#4285F4" }}>G</Text>
+                <Text style={{ color: "#EA4335" }}>o</Text>
+                <Text style={{ color: "#FBBC05" }}>o</Text>
+                <Text style={{ color: "#4285F4" }}>g</Text>
+                <Text style={{ color: "#34A853" }}>l</Text>
+                <Text style={{ color: "#EA4335" }}>e</Text>
+              </Text>
+              <Text className="text-base font-semibold text-gray-800">
+                Google ile devam et
+              </Text>
+            </Pressable>
           ) : (
             <Pressable
               disabled
@@ -270,118 +319,5 @@ export default function AuthScreen() {
         </View>
       </View>
     </SafeAreaView>
-  );
-}
-
-type GoogleSignInButtonProps = {
-  isLoading: boolean;
-  setIsLoading: (loading: boolean) => void;
-  onCompleteAuth: (authResponse: AuthResponse) => Promise<void>;
-};
-
-function GoogleSignInButton({
-  isLoading,
-  setIsLoading,
-  onCompleteAuth,
-}: GoogleSignInButtonProps) {
-  const googleHandledRef = useRef<string | null>(null);
-  const clientId = getGoogleClientId();
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GOOGLE_CLIENT_ID || undefined,
-    iosClientId: GOOGLE_CLIENT_ID_IOS || undefined,
-    androidClientId: GOOGLE_CLIENT_ID_ANDROID || undefined,
-    redirectUri,
-  });
-
-  useEffect(() => {
-    if (response?.type !== "success") return;
-    const code = response.params.code;
-    if (!code || googleHandledRef.current === code) return;
-    googleHandledRef.current = code;
-    handleGoogleResponse();
-  }, [response]);
-
-  async function handleGoogleResponse() {
-    if (response?.type !== "success") return;
-
-    try {
-      setIsLoading(true);
-
-      if (!clientId) {
-        throw new Error("Google Client ID yapılandırılmamış.");
-      }
-
-      const { code } = response.params;
-      if (!code || !request?.codeVerifier) {
-        throw new Error("Google yetkilendirme kodu alınamadı.");
-      }
-
-      const tokenResponse = await exchangeCodeAsync(
-        {
-          clientId,
-          code,
-          redirectUri,
-          extraParams: {
-            code_verifier: request.codeVerifier,
-          },
-        },
-        {
-          tokenEndpoint: "https://oauth2.googleapis.com/token",
-        }
-      );
-
-      if (!tokenResponse.idToken) {
-        throw new Error("Google idToken alınamadı.");
-      }
-
-      const authResponse = await apiFetch<AuthResponse>("/auth/google", {
-        method: "POST",
-        body: JSON.stringify({ idToken: tokenResponse.idToken }),
-      });
-
-      await onCompleteAuth(authResponse);
-    } catch (err) {
-      Alert.alert(
-        "Giriş başarısız",
-        err instanceof Error ? err.message : "Google ile giriş yapılamadı."
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleGoogleSignIn() {
-    try {
-      if (!clientId) return;
-      const result = await promptAsync();
-      if (result.type === "cancel" || result.type === "dismiss") return;
-    } catch (err) {
-      Alert.alert(
-        "Giriş başarısız",
-        err instanceof Error ? err.message : "Google ile giriş yapılamadı."
-      );
-    }
-  }
-
-  return (
-    <Pressable
-      onPress={handleGoogleSignIn}
-      disabled={isLoading || !request}
-      className="flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-4"
-      style={{ opacity: isLoading || !request ? 0.7 : 1 }}
-    >
-      <Text className="mr-2 text-base font-bold">
-        <Text style={{ color: "#4285F4" }}>G</Text>
-        <Text style={{ color: "#EA4335" }}>o</Text>
-        <Text style={{ color: "#FBBC05" }}>o</Text>
-        <Text style={{ color: "#4285F4" }}>g</Text>
-        <Text style={{ color: "#34A853" }}>l</Text>
-        <Text style={{ color: "#EA4335" }}>e</Text>
-      </Text>
-      <Text className="text-base font-semibold text-gray-800">
-        Google ile devam et
-      </Text>
-    </Pressable>
   );
 }
