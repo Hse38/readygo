@@ -1,45 +1,29 @@
 import * as AppleAuthentication from "expo-apple-authentication";
-import {
-  GoogleSignin,
-  statusCodes,
-} from "@react-native-google-signin/google-signin";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Text } from "../components/ui/Text";
 import {
   GOOGLE_CLIENT_ID_ANDROID,
   GOOGLE_CLIENT_ID_IOS,
   GOOGLE_WEB_CLIENT_ID,
 } from "../constants/config";
 import type { User } from "../constants/types";
+import { useTheme } from "../hooks/useTheme";
 import { apiFetch } from "../lib/api";
 import { getToken, getUser, saveToken, saveUser } from "../lib/storage";
 
-const PRIMARY = "#AFA9EC";
-
 type AuthResponse = {
   token: string;
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-    surname: string | null;
-  };
+  user: { id: string; email: string; name: string | null; surname: string | null };
 };
 
-type ProfileResponse = {
-  user: User;
-};
-
+type ProfileResponse = { user: User };
 type LocalProfile = Partial<User> & {
   occupation?: string;
   workLocation?: string;
@@ -50,13 +34,7 @@ type LocalProfile = Partial<User> & {
 };
 
 function isLocalProfile(user: object | null): user is LocalProfile {
-  return (
-    !!user &&
-    typeof user === "object" &&
-    "occupation" in user &&
-    typeof user.occupation === "string" &&
-    user.occupation.length > 0
-  );
+  return !!user && typeof user === "object" && "occupation" in user;
 }
 
 function isGoogleAuthConfigured(): boolean {
@@ -68,6 +46,7 @@ function isGoogleAuthConfigured(): boolean {
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { colors, spacing, radii, shadows } = useTheme();
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
@@ -75,33 +54,26 @@ export default function AuthScreen() {
   useEffect(() => {
     async function checkExistingToken() {
       const token = await getToken();
-      if (token) {
-        router.replace("/(tabs)/home");
-      } else {
-        setIsCheckingToken(false);
-      }
+      if (token) router.replace("/(tabs)/home");
+      else setIsCheckingToken(false);
     }
-
     checkExistingToken();
   }, [router]);
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
-  }, []);
-
-  useEffect(() => {
-    if (!isGoogleAuthConfigured()) return;
-
-    GoogleSignin.configure({
-      webClientId: GOOGLE_WEB_CLIENT_ID,
-      ...(GOOGLE_CLIENT_ID_IOS ? { iosClientId: GOOGLE_CLIENT_ID_IOS } : {}),
-    });
+    if (isGoogleAuthConfigured()) {
+      GoogleSignin.configure({
+        webClientId: GOOGLE_WEB_CLIENT_ID,
+        ...(GOOGLE_CLIENT_ID_IOS ? { iosClientId: GOOGLE_CLIENT_ID_IOS } : {}),
+      });
+    }
   }, []);
 
   async function completeAuth(authResponse: AuthResponse) {
     await saveToken(authResponse.token);
-
     const localProfile = await getUser();
+
     if (isLocalProfile(localProfile)) {
       try {
         const profileResponse = await apiFetch<ProfileResponse>(
@@ -144,25 +116,19 @@ export default function AuthScreen() {
         surname: authResponse.user.surname ?? "",
       });
     }
-
     router.replace("/(tabs)/home");
   }
 
   async function handleAppleSignIn() {
     try {
       setIsLoading(true);
-
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-
-      if (!credential.identityToken) {
-        throw new Error("Apple kimlik doğrulama başarısız.");
-      }
-
+      if (!credential.identityToken) throw new Error("Apple girisi basarisiz.");
       const authResponse = await apiFetch<AuthResponse>("/auth/apple", {
         method: "POST",
         body: JSON.stringify({
@@ -173,15 +139,12 @@ export default function AuthScreen() {
           },
         }),
       });
-
       await completeAuth(authResponse);
     } catch (err) {
       const error = err as { code?: string };
-      if (error.code === "ERR_REQUEST_CANCELED") return;
-      Alert.alert(
-        "Giriş başarısız",
-        err instanceof Error ? err.message : "Apple ile giriş yapılamadı."
-      );
+      if (error.code !== "ERR_REQUEST_CANCELED") {
+        Alert.alert("Giris basarisiz", err instanceof Error ? err.message : "Apple ile giris olmadi.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -190,32 +153,21 @@ export default function AuthScreen() {
   async function handleGoogleSignIn() {
     try {
       setIsLoading(true);
-
-      await GoogleSignin.hasPlayServices({
-        showPlayServicesUpdateDialog: true,
-      });
-
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const signInResult = await GoogleSignin.signIn();
       if (signInResult.type === "cancelled") return;
-
       const tokens = await GoogleSignin.getTokens();
-      const idToken = tokens.idToken;
-      if (!idToken) {
-        throw new Error("Google idToken alınamadı.");
-      }
-
+      if (!tokens.idToken) throw new Error("Google idToken alinamadi.");
       const authResponse = await apiFetch<AuthResponse>("/auth/google", {
         method: "POST",
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken: tokens.idToken }),
       });
-
       await completeAuth(authResponse);
     } catch (error: unknown) {
       const err = error as { code?: string };
-      if (err.code === statusCodes.SIGN_IN_CANCELLED) return;
-      if (err.code === statusCodes.IN_PROGRESS) return;
-
-      Alert.alert("Hata", "Google ile giriş yapılamadı");
+      if (err.code !== statusCodes.SIGN_IN_CANCELLED && err.code !== statusCodes.IN_PROGRESS) {
+        Alert.alert("Hata", "Google ile giris yapilamadi");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -223,104 +175,72 @@ export default function AuthScreen() {
 
   if (isCheckingToken) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color={PRIMARY} />
+      <SafeAreaView style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 px-6">
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-5xl font-light tracking-tight text-gray-900">
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={{ flex: 1 }}>
+        <View style={{ height: "40%", alignItems: "center", justifyContent: "center" }}>
+          <View style={{ position: "absolute", width: 280, height: 280, borderRadius: 999, backgroundColor: colors.primary, opacity: 0.12, top: -80 }} />
+          <View style={{ position: "absolute", width: 210, height: 210, borderRadius: 999, backgroundColor: colors.primaryLight, opacity: 0.18, top: 10, right: -30 }} />
+          <Text style={{ fontSize: 48, fontFamily: "Inter_700Bold", color: colors.textSecondary }}>
             r
-            <Text className="font-bold" style={{ color: PRIMARY }}>
-              GO
-            </Text>
+            <Text style={{ color: colors.primary, fontSize: 48, fontFamily: "Inter_700Bold" }}>GO</Text>
           </Text>
-          <Text className="mt-3 text-base text-gray-500">
-            Hesabına giriş yap
+          <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
+            Etkinliklerini akillica planla
           </Text>
         </View>
 
-        <View className="gap-3 pb-4">
+        <Card
+          style={{
+            flex: 1,
+            borderTopLeftRadius: radii.xl,
+            borderTopRightRadius: radii.xl,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            padding: spacing.xl,
+            ...shadows.lg,
+          }}
+        >
+          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+            Hesabina giris yap
+          </Text>
+
           {isAppleAvailable && Platform.OS === "ios" ? (
-            <Pressable
-              onPress={handleAppleSignIn}
-              disabled={isLoading}
-              className="flex-row items-center justify-center rounded-2xl py-4"
-              style={{
-                backgroundColor: "#000000",
-                opacity: isLoading ? 0.7 : 1,
-              }}
-            >
-              <Text className="mr-2 text-xl text-white">
-                {Platform.OS === "ios" ? "\uF8FF" : ""}
-              </Text>
-              <Text className="text-base font-semibold text-white">
-                Apple ile devam et
-              </Text>
-            </Pressable>
+            <Button onPress={handleAppleSignIn} disabled={isLoading} size="lg" style={{ backgroundColor: "#000000", borderRadius: radii.xl }}>
+               Apple ile devam et
+            </Button>
           ) : null}
+
+          <View style={{ alignItems: "center", marginVertical: spacing.md }}>
+            <Text variant="caption" color={colors.textTertiary}>
+              veya
+            </Text>
+          </View>
 
           {isGoogleAuthConfigured() ? (
-            <Pressable
-              onPress={handleGoogleSignIn}
-              disabled={isLoading}
-              className="flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-4"
-              style={{ opacity: isLoading ? 0.7 : 1 }}
-            >
-              <Text className="mr-2 text-base font-bold">
-                <Text style={{ color: "#4285F4" }}>G</Text>
-                <Text style={{ color: "#EA4335" }}>o</Text>
-                <Text style={{ color: "#FBBC05" }}>o</Text>
-                <Text style={{ color: "#4285F4" }}>g</Text>
-                <Text style={{ color: "#34A853" }}>l</Text>
-                <Text style={{ color: "#EA4335" }}>e</Text>
-              </Text>
-              <Text className="text-base font-semibold text-gray-800">
-                Google ile devam et
-              </Text>
-            </Pressable>
+            <Button onPress={handleGoogleSignIn} disabled={isLoading} variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
+              Google ile devam et
+            </Button>
           ) : (
-            <Pressable
-              disabled
-              className="flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-4"
-              style={{ opacity: 0.5 }}
-            >
-              <Text className="mr-2 text-base font-bold">
-                <Text style={{ color: "#4285F4" }}>G</Text>
-                <Text style={{ color: "#EA4335" }}>o</Text>
-                <Text style={{ color: "#FBBC05" }}>o</Text>
-                <Text style={{ color: "#4285F4" }}>g</Text>
-                <Text style={{ color: "#34A853" }}>l</Text>
-                <Text style={{ color: "#EA4335" }}>e</Text>
-              </Text>
-              <Text className="text-base font-semibold text-gray-400">
-                Google ile devam et · Yakında
-              </Text>
-            </Pressable>
+            <Button onPress={() => {}} disabled variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
+              Google ile devam et · Yakinda
+            </Button>
           )}
 
-          {isLoading ? (
-            <ActivityIndicator color={PRIMARY} className="mt-2" />
-          ) : null}
+          {isLoading ? <ActivityIndicator style={{ marginTop: spacing.md }} color={colors.primary} /> : null}
 
-          <View className="mt-4 flex-row items-center justify-center gap-1">
-            <Pressable>
-              <Text className="text-xs text-gray-400 underline">
-                Gizlilik Politikası
-              </Text>
-            </Pressable>
-            <Text className="text-xs text-gray-300">·</Text>
-            <Pressable>
-              <Text className="text-xs text-gray-400 underline">
-                Kullanım Koşulları
-              </Text>
-            </Pressable>
+          <View style={{ marginTop: "auto", flexDirection: "row", justifyContent: "center" }}>
+            <Text variant="caption" color={colors.textTertiary}>
+              Gizlilik Politikasi · Kullanim Kosullari
+            </Text>
           </View>
-        </View>
+        </Card>
       </View>
     </SafeAreaView>
   );
