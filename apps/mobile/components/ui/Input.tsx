@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TextInput, View, type TextInputProps } from "react-native";
+import { TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from "react-native";
 
 import { useTheme } from "../../hooks/useTheme";
 import { Text } from "./Text";
@@ -7,6 +7,7 @@ import { Text } from "./Text";
 type Props = {
   label?: string;
   error?: string;
+  inputStyle?: StyleProp<TextStyle>;
 } & Pick<
   TextInputProps,
   "placeholder" | "value" | "onChangeText" | "secureTextEntry" | "multiline"
@@ -20,6 +21,7 @@ export function Input({
   error,
   secureTextEntry,
   multiline,
+  inputStyle,
 }: Props) {
   const { colors, radii, spacing, typography } = useTheme();
   const [focused, setFocused] = useState(false);
@@ -40,19 +42,23 @@ export function Input({
         multiline={multiline}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        style={{
-          borderWidth: 1,
-          borderColor: error ? colors.error : focused ? colors.primary : colors.border,
-          borderRadius: radii.md,
-          backgroundColor: colors.surface,
-          color: colors.text,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          minHeight: multiline ? 100 : 48,
-          textAlignVertical: multiline ? "top" : "center",
-          fontFamily: typography.fonts.regular,
-          fontSize: typography.sizes.md,
-        }}
+        style={[
+          {
+            borderWidth: 1,
+            borderColor: error ? colors.error : focused ? colors.primary : colors.border,
+            borderRadius: radii.md,
+            backgroundColor: colors.surface,
+            color: colors.text,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            minHeight: multiline ? 100 : 48,
+            textAlignVertical: multiline ? "top" : "center",
+            fontFamily: typography.fonts.regular,
+            fontSize: typography.sizes.md,
+            width: "100%",
+          },
+          inputStyle,
+        ]}
       />
       {error ? (
         <Text variant="caption" color={colors.error} style={{ marginTop: spacing.xs }}>

@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
@@ -23,6 +22,9 @@ import { useTheme } from "../hooks/useTheme";
 import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import { getToken, saveUser } from "../lib/storage";
+
+const TOTAL_STEPS = 5;
+const STEP_EMOJIS = ["👋", "💼", "🗓️", "🏠", "🎉"];
 
 const WEEKDAYS = [
   { value: "monday" },
@@ -75,6 +77,11 @@ const INITIAL_DATA: OnboardingData = {
   morningAlarm: false,
 };
 
+const inputFieldStyle = {
+  minHeight: 52,
+  borderRadius: 24,
+} as const;
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
@@ -83,6 +90,20 @@ export default function OnboardingScreen() {
   const [data, setData] = useState<OnboardingData>(INITIAL_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: step / TOTAL_STEPS,
+      duration: 280,
+      useNativeDriver: false,
+    }).start();
+  }, [step, progressAnim]);
+
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
 
   function updateField<K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) {
     setData((prev) => ({ ...prev, [key]: value }));
@@ -136,7 +157,6 @@ export default function OnboardingScreen() {
     try {
       const token = await getToken();
       if (!token) {
-        await saveUser({ ...profilePayload, email: "", id: "" });
         router.replace("/auth");
         return;
       }
@@ -157,185 +177,254 @@ export default function OnboardingScreen() {
     }
   }
 
-  const progress = step / 5;
+  function handleNext() {
+    if (step === TOTAL_STEPS) {
+      void handleFinish();
+      return;
+    }
+    if (validateStep()) animateStepChange(step + 1);
+  }
+
+  const stepTitles = [
+    t("onboarding.step1Title"),
+    t("onboarding.step2Title"),
+    t("onboarding.step3Title"),
+    t("onboarding.step4Title"),
+    t("onboarding.step5Title"),
+  ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={{ flex: 1 }}>
+          {/* TOP: progress */}
           <View
             style={{
-              height: 3,
-              borderRadius: radii.full,
-              overflow: "hidden",
-              backgroundColor: colors.borderLight,
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.md,
+              paddingBottom: spacing.sm,
             }}
           >
-            <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: colors.primary }} />
-          </View>
-          <Text variant="caption" color={colors.textTertiary} style={{ marginTop: spacing.xs, textAlign: "right" }}>
-            {step} / 5
-          </Text>
-        </View>
-
-        <ScrollView
-          style={{ flex: 1, paddingHorizontal: spacing.xl }}
-          contentContainerStyle={{ paddingBottom: spacing.xl, paddingTop: spacing.lg }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View style={{ opacity: fadeAnim }}>
-            <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
-              <Text style={{ fontSize: 44 }}>{["👋", "💼", "🗓️", "🏠", "🎉"][step - 1]}</Text>
+            <Text
+              variant="caption"
+              color={colors.textTertiary}
+              style={{ marginBottom: spacing.xs, textAlign: "right" }}
+            >
+              {step} / {TOTAL_STEPS}
+            </Text>
+            <View
+              style={{
+                height: 4,
+                borderRadius: radii.full,
+                overflow: "hidden",
+                backgroundColor: colors.borderLight,
+              }}
+            >
+              <Animated.View
+                style={{
+                  width: progressWidth,
+                  height: "100%",
+                  backgroundColor: colors.primary,
+                  borderRadius: radii.full,
+                }}
+              />
             </View>
+          </View>
 
-            {step === 1 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("onboarding.step1Title")}
-                </Text>
-                <Input label={t("onboarding.name")} value={data.name} onChangeText={(txt) => updateField("name", txt)} />
-                <Input label={t("onboarding.surname")} value={data.surname} onChangeText={(txt) => updateField("surname", txt)} />
-              </>
-            ) : null}
-
-            {step === 2 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("onboarding.step2Title")}
-                </Text>
-                <Input
-                  label={t("onboarding.occupation")}
-                  value={data.occupation}
-                  onChangeText={(t) => updateField("occupation", t)}
-                />
-                <LocationInput
-                  label={t("onboarding.workLocation")}
-                  value={data.workLocation}
-                  placeholder={t("onboarding.workPlaceholder")}
-                  onLocationSelect={({ address, lat, lng }) => {
-                    updateField("workLocation", address);
-                    updateField("workLocationLat", address ? lat : null);
-                    updateField("workLocationLng", address ? lng : null);
-                  }}
-                />
-              </>
-            ) : null}
-
-            {step === 3 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("onboarding.step3Title")}
-                </Text>
-                <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  {t("onboarding.weekdays")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }}>
-                  {WEEKDAYS.map((day) => {
-                    const selected = data.workDays.includes(day.value);
-                    return (
-                      <Pressable
-                        key={day.value}
-                        onPress={() =>
-                          updateField(
-                            "workDays",
-                            selected
-                              ? data.workDays.filter((d) => d !== day.value)
-                              : [...data.workDays, day.value]
-                          )
-                        }
-                        style={{
-                          borderRadius: radii.full,
-                          paddingHorizontal: spacing.lg,
-                          paddingVertical: spacing.sm,
-                          backgroundColor: selected ? colors.primary : colors.backgroundSecondary,
-                        }}
-                      >
-                        <Text variant="label" color={selected ? colors.white : colors.textSecondary}>
-                          {t(`onboarding.weekdaysShort.${day.value}`)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  {t("onboarding.transport")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-                  {TRANSPORT_MODES.map((mode) => {
-                    const selected = data.transportMode === mode.value;
-                    return (
-                      <Pressable
-                        key={mode.value}
-                        onPress={() => updateField("transportMode", mode.value)}
-                        style={{
-                          width: "48%",
-                          borderRadius: radii.lg,
-                          borderWidth: 1.5,
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
-                          padding: spacing.md,
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text style={{ fontSize: 24 }}>{mode.icon}</Text>
-                        <Text
-                          variant="bodySmall"
-                          color={selected ? colors.text : colors.textSecondary}
-                          style={{ marginTop: spacing.xs }}
-                        >
-                          {t(`onboarding.transportModes.${mode.value}`)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </>
-            ) : null}
-
-            {step === 4 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("onboarding.step4Title")}
-                </Text>
-                <LocationInput
-                  label={t("onboarding.homeAddress")}
-                  value={data.homeLocation}
-                  placeholder={t("onboarding.homePlaceholder")}
-                  onLocationSelect={({ address, lat, lng }) => {
-                    updateField("homeLocation", address);
-                    updateField("homeLocationLat", address ? lat : null);
-                    updateField("homeLocationLng", address ? lng : null);
-                  }}
-                />
+          {/* MIDDLE: scrollable content */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.lg,
+              paddingBottom: spacing.xl,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
+              <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
                 <View
                   style={{
-                    marginTop: spacing.sm,
-                    flexDirection: "row",
+                    width: 96,
+                    height: 96,
+                    borderRadius: radii.full,
+                    backgroundColor: colors.backgroundTertiary,
                     alignItems: "center",
-                    justifyContent: "space-between",
+                    justifyContent: "center",
                   }}
                 >
-                  <Text variant="body">{t("onboarding.morningAlarm")}</Text>
-                  <Switch
-                    value={data.morningAlarm}
-                    onValueChange={(v) => updateField("morningAlarm", v)}
-                    trackColor={{ false: colors.border, true: colors.primaryLight }}
-                    thumbColor={data.morningAlarm ? colors.primary : colors.surface}
+                  <Text style={{ fontSize: 56, lineHeight: 64 }}>{STEP_EMOJIS[step - 1]}</Text>
+                </View>
+              </View>
+
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontFamily: "Inter_700Bold",
+                  color: colors.text,
+                  marginBottom: spacing.xl,
+                  textAlign: "center",
+                }}
+              >
+                {stepTitles[step - 1]}
+              </Text>
+
+              {step === 1 ? (
+                <View>
+                  <Input
+                    label={t("onboarding.name")}
+                    value={data.name}
+                    onChangeText={(txt) => updateField("name", txt)}
+                    inputStyle={inputFieldStyle}
+                  />
+                  <Input
+                    label={t("onboarding.surname")}
+                    value={data.surname}
+                    onChangeText={(txt) => updateField("surname", txt)}
+                    inputStyle={inputFieldStyle}
                   />
                 </View>
-              </>
-            ) : null}
+              ) : null}
 
-            {step === 5 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("onboarding.step5Title")}
-                </Text>
-                <Card>
+              {step === 2 ? (
+                <View>
+                  <Input
+                    label={t("onboarding.occupation")}
+                    value={data.occupation}
+                    onChangeText={(txt) => updateField("occupation", txt)}
+                    inputStyle={inputFieldStyle}
+                  />
+                  <LocationInput
+                    label={t("onboarding.workLocation")}
+                    value={data.workLocation}
+                    placeholder={t("onboarding.workPlaceholder")}
+                    onLocationSelect={({ address, lat, lng }) => {
+                      updateField("workLocation", address);
+                      updateField("workLocationLat", address ? lat : null);
+                      updateField("workLocationLng", address ? lng : null);
+                    }}
+                  />
+                </View>
+              ) : null}
+
+              {step === 3 ? (
+                <View>
+                  <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.md }}>
+                    {t("onboarding.weekdays")}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: spacing.sm,
+                      marginBottom: spacing.xl,
+                    }}
+                  >
+                    {WEEKDAYS.map((day) => {
+                      const selected = data.workDays.includes(day.value);
+                      return (
+                        <Pressable
+                          key={day.value}
+                          onPress={() =>
+                            updateField(
+                              "workDays",
+                              selected
+                                ? data.workDays.filter((d) => d !== day.value)
+                                : [...data.workDays, day.value]
+                            )
+                          }
+                          style={{
+                            borderRadius: radii.full,
+                            paddingHorizontal: spacing.lg,
+                            paddingVertical: spacing.md,
+                            backgroundColor: selected ? colors.primary : colors.backgroundSecondary,
+                          }}
+                        >
+                          <Text variant="label" color={selected ? colors.white : colors.textSecondary}>
+                            {t(`onboarding.weekdaysShort.${day.value}`)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.md }}>
+                    {t("onboarding.transport")}
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
+                    {TRANSPORT_MODES.map((mode) => {
+                      const selected = data.transportMode === mode.value;
+                      return (
+                        <Pressable
+                          key={mode.value}
+                          onPress={() => updateField("transportMode", mode.value)}
+                          style={{
+                            width: "47%",
+                            borderRadius: radii.xl,
+                            borderWidth: 1.5,
+                            borderColor: selected ? colors.primary : colors.border,
+                            backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
+                            paddingVertical: spacing.lg,
+                            paddingHorizontal: spacing.md,
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 28 }}>{mode.icon}</Text>
+                          <Text
+                            variant="bodySmall"
+                            color={selected ? colors.text : colors.textSecondary}
+                            style={{ marginTop: spacing.sm, textAlign: "center" }}
+                          >
+                            {t(`onboarding.transportModes.${mode.value}`)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {step === 4 ? (
+                <View>
+                  <LocationInput
+                    label={t("onboarding.homeAddress")}
+                    value={data.homeLocation}
+                    placeholder={t("onboarding.homePlaceholder")}
+                    onLocationSelect={({ address, lat, lng }) => {
+                      updateField("homeLocation", address);
+                      updateField("homeLocationLat", address ? lat : null);
+                      updateField("homeLocationLng", address ? lng : null);
+                    }}
+                  />
+                  <View
+                    style={{
+                      marginTop: spacing.lg,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: radii.xl,
+                      backgroundColor: colors.surface,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text variant="body">{t("onboarding.morningAlarm")}</Text>
+                    <Switch
+                      value={data.morningAlarm}
+                      onValueChange={(v) => updateField("morningAlarm", v)}
+                      trackColor={{ false: colors.border, true: colors.primaryLight }}
+                      thumbColor={data.morningAlarm ? colors.primary : colors.surface}
+                    />
+                  </View>
+                </View>
+              ) : null}
+
+              {step === 5 ? (
+                <Card style={{ marginTop: spacing.sm }}>
                   <SummaryRow label={t("onboarding.summary.fullName")} value={`${data.name} ${data.surname}`} />
                   <SummaryRow label={t("onboarding.occupation")} value={data.occupation} />
                   <SummaryRow label={t("onboarding.workLocation")} value={data.workLocation} />
@@ -343,37 +432,56 @@ export default function OnboardingScreen() {
                   <SummaryRow label={t("onboarding.summary.transport")} value={data.transportMode || "-"} />
                   <SummaryRow label={t("onboarding.summary.homeAddress")} value={data.homeLocation} />
                 </Card>
-              </>
-            ) : null}
-          </Animated.View>
-        </ScrollView>
+              ) : null}
+            </Animated.View>
+          </ScrollView>
 
-        <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
-          {step === 5 ? (
-            <Button onPress={handleFinish} loading={isSubmitting} size="lg" style={{ borderRadius: radii.xl }}>
-              {t("onboarding.start")}
-            </Button>
-          ) : (
-            <Button
-              onPress={() => {
-                if (validateStep()) animateStepChange(step + 1);
-              }}
-              size="lg"
-              style={{ borderRadius: radii.xl }}
-            >
-              {t("common.next")}
-            </Button>
-          )}
-          {step > 1 ? (
-            <Button
-              onPress={() => animateStepChange(step - 1)}
-              variant="ghost"
-              size="md"
-              style={{ marginTop: spacing.sm }}
-            >
-              {t("common.back")}
-            </Button>
-          ) : null}
+          {/* BOTTOM: fixed horizontal button row */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.md,
+              paddingBottom: spacing.xl,
+              borderTopWidth: 1,
+              borderTopColor: colors.borderLight,
+              backgroundColor: colors.background,
+            }}
+          >
+            {step > 1 ? (
+              <Button
+                variant="ghost"
+                size="lg"
+                onPress={() => animateStepChange(step - 1)}
+                style={{ minHeight: 48, minWidth: 100 }}
+              >
+                {t("common.back")}
+              </Button>
+            ) : (
+              <View style={{ minWidth: 100 }} />
+            )}
+
+            {step < TOTAL_STEPS ? (
+              <Button
+                size="lg"
+                onPress={handleNext}
+                style={{ minHeight: 48, minWidth: 120 }}
+              >
+                {t("common.next")}
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                onPress={() => void handleFinish()}
+                loading={isSubmitting}
+                style={{ minHeight: 48, minWidth: 120 }}
+              >
+                {t("onboarding.start")}
+              </Button>
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -383,11 +491,11 @@ export default function OnboardingScreen() {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   const { colors, spacing } = useTheme();
   return (
-    <View style={{ marginBottom: spacing.sm }}>
+    <View style={{ marginBottom: spacing.md }}>
       <Text variant="caption" color={colors.textSecondary}>
         {label}
       </Text>
-      <Text variant="body" color={colors.text}>
+      <Text variant="body" color={colors.text} style={{ marginTop: spacing.xs }}>
         {value || "-"}
       </Text>
     </View>

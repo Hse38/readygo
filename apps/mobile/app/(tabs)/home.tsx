@@ -209,7 +209,7 @@ export default function HomeScreen() {
     } catch (err) {
       if (isSessionInvalidError(err)) {
         await clearAll();
-        router.replace("/onboarding");
+        router.replace("/auth");
         return;
       }
       setError(err instanceof Error ? err.message : t("home.eventsLoadError"));

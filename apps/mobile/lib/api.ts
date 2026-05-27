@@ -20,7 +20,7 @@ async function handleInvalidSession(): Promise<void> {
   if (router.canDismiss?.()) {
     router.dismissAll();
   }
-  router.replace("/onboarding");
+  router.replace("/auth");
 }
 
 export async function apiFetch<T = unknown>(

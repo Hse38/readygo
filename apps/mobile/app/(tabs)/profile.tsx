@@ -269,7 +269,7 @@ export default function ProfileScreen() {
   async function handleLogout() {
     await clearAll();
     await saveProfilePhoto(null);
-    router.replace("/onboarding");
+    router.replace("/auth");
   }
 
   async function handleLanguageChange(nextLocale: "tr" | "en") {

@@ -17,6 +17,7 @@ import type { User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
 import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
+import { isProfileComplete } from "../lib/profile";
 import { getToken, getUser, saveToken, saveUser } from "../lib/storage";
 
 type AuthResponse = {
@@ -56,10 +57,21 @@ export default function AuthScreen() {
   useEffect(() => {
     async function checkExistingToken() {
       const token = await getToken();
-      if (token) router.replace("/(tabs)/home");
-      else setIsCheckingToken(false);
+      if (!token) {
+        setIsCheckingToken(false);
+        return;
+      }
+      try {
+        const profileResponse = await apiFetch<ProfileResponse>("/profile", {}, token);
+        await saveUser(profileResponse.user);
+        router.replace(
+          isProfileComplete(profileResponse.user) ? "/(tabs)/home" : "/onboarding"
+        );
+      } catch {
+        setIsCheckingToken(false);
+      }
     }
-    checkExistingToken();
+    void checkExistingToken();
   }, [router]);
 
   useEffect(() => {
@@ -75,8 +87,9 @@ export default function AuthScreen() {
   async function completeAuth(authResponse: AuthResponse) {
     await saveToken(authResponse.token);
     const localProfile = await getUser();
+    let resolvedUser: User;
 
-    if (isLocalProfile(localProfile)) {
+    if (isLocalProfile(localProfile) && localProfile.occupation?.trim()) {
       try {
         const profileResponse = await apiFetch<ProfileResponse>(
           "/profile",
@@ -99,26 +112,33 @@ export default function AuthScreen() {
           },
           authResponse.token
         );
-        await saveUser(profileResponse.user);
+        resolvedUser = profileResponse.user;
       } catch {
-        await saveUser({
+        resolvedUser = {
           ...authResponse.user,
           ...localProfile,
           id: authResponse.user.id,
           email: authResponse.user.email,
           name: authResponse.user.name ?? localProfile.name ?? "",
           surname: authResponse.user.surname ?? localProfile.surname ?? "",
-        });
+        };
       }
     } else {
-      await saveUser({
-        id: authResponse.user.id,
-        email: authResponse.user.email,
-        name: authResponse.user.name ?? "",
-        surname: authResponse.user.surname ?? "",
-      });
+      try {
+        const profileResponse = await apiFetch<ProfileResponse>("/profile", {}, authResponse.token);
+        resolvedUser = profileResponse.user;
+      } catch {
+        resolvedUser = {
+          id: authResponse.user.id,
+          email: authResponse.user.email,
+          name: authResponse.user.name ?? "",
+          surname: authResponse.user.surname ?? "",
+        };
+      }
     }
-    router.replace("/(tabs)/home");
+
+    await saveUser(resolvedUser);
+    router.replace(isProfileComplete(resolvedUser) ? "/(tabs)/home" : "/onboarding");
   }
 
   async function handleAppleSignIn() {

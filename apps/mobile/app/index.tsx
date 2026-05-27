@@ -4,7 +4,11 @@ import { ActivityIndicator, View } from "react-native";
 
 import { useTheme } from "../hooks/useTheme";
 import { apiFetch } from "../lib/api";
-import { getToken, getUser } from "../lib/storage";
+import { isProfileComplete } from "../lib/profile";
+import { getToken, saveUser } from "../lib/storage";
+import type { User } from "../constants/types";
+
+type ProfileResponse = { user: User };
 
 export default function Index() {
   const { colors } = useTheme();
@@ -13,29 +17,25 @@ export default function Index() {
   useEffect(() => {
     async function resolveRoute() {
       const token = await getToken();
-      if (token) {
-        try {
-          await apiFetch("/events", {}, token);
-        } catch (error) {
-          if (error instanceof Error && error.message === "AUTH_SESSION_INVALID") {
-            setHref("/onboarding");
-            return;
-          }
-        }
-        setHref("/(tabs)/home");
-        return;
-      }
-
-      const user = await getUser();
-      if (user) {
+      if (!token) {
         setHref("/auth");
         return;
       }
 
-      setHref("/onboarding");
+      try {
+        const response = await apiFetch<ProfileResponse>("/profile", {}, token);
+        await saveUser(response.user);
+        setHref(isProfileComplete(response.user) ? "/(tabs)/home" : "/onboarding");
+      } catch (error) {
+        if (error instanceof Error && error.message === "AUTH_SESSION_INVALID") {
+          setHref("/auth");
+          return;
+        }
+        setHref("/onboarding");
+      }
     }
 
-    resolveRoute();
+    void resolveRoute();
   }, []);
 
   if (!href) {
