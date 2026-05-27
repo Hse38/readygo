@@ -1,4 +1,18 @@
 import { API_URL } from "../constants/config";
+import { Linking } from "react-native";
+import { clearAll } from "./storage";
+
+function isUserNotFoundMessage(body: unknown): boolean {
+  const errorMessage =
+    typeof body === "object" && body !== null
+      ? (body as { error?: string; message?: string }).error ??
+        (body as { error?: string; message?: string }).message
+      : typeof body === "string"
+        ? body
+        : "";
+
+  return typeof errorMessage === "string" && errorMessage.toLowerCase().includes("user not found");
+}
 
 export async function apiFetch<T = unknown>(
   path: string,
@@ -20,6 +34,12 @@ export async function apiFetch<T = unknown>(
   });
 
   const body = await response.json().catch(() => null);
+
+  if (response.status === 401 || isUserNotFoundMessage(body)) {
+    await clearAll();
+    await Linking.openURL("readygo:///onboarding").catch(() => undefined);
+    throw new Error("AUTH_SESSION_INVALID");
+  }
 
   if (!response.ok) {
     const message =

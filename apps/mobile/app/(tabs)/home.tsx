@@ -30,7 +30,7 @@ import type { ChecklistItem, Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
 import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
-import { getToken, getUser } from "../../lib/storage";
+import { clearAll, getToken, getUser } from "../../lib/storage";
 
 type EventsResponse = { events: Event[] };
 type EventTypeStyle = { backgroundColor: string; dotColor: string; Icon: typeof IconCalendar };
@@ -140,6 +140,10 @@ function getNearestEventWithChecklist(events: Event[]): Event | null {
   return null;
 }
 
+function isSessionInvalidError(error: unknown): boolean {
+  return error instanceof Error && error.message === "AUTH_SESSION_INVALID";
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date?: string }>();
@@ -190,6 +194,11 @@ export default function HomeScreen() {
       const response = await apiFetch<EventsResponse>("/events", {}, token);
       setEvents(response.events ?? []);
     } catch (err) {
+      if (isSessionInvalidError(err)) {
+        await clearAll();
+        router.replace("/onboarding");
+        return;
+      }
       setError(err instanceof Error ? err.message : t("home.eventsLoadError"));
     } finally {
       setIsLoading(false);

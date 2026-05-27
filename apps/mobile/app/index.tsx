@@ -2,6 +2,7 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+import { apiFetch } from "../lib/api";
 import { getToken, getUser } from "../lib/storage";
 
 export default function Index() {
@@ -11,6 +12,14 @@ export default function Index() {
     async function resolveRoute() {
       const token = await getToken();
       if (token) {
+        try {
+          await apiFetch("/events", {}, token);
+        } catch (error) {
+          if (error instanceof Error && error.message === "AUTH_SESSION_INVALID") {
+            setHref("/onboarding");
+            return;
+          }
+        }
         setHref("/(tabs)/home");
         return;
       }

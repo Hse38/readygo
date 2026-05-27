@@ -214,38 +214,44 @@ export default function NewEventScreen() {
     [form.type]
   );
   const selectedTransport = TRANSPORT_MODES.find((mode) => mode.value === form.travelMode);
+  const isBottomButtonDisabled =
+    isSubmitting ||
+    (step === 1 && !form.type) ||
+    (step === 2 && !form.title.trim()) ||
+    (step === 3 && !form.type);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-          <Pressable onPress={() => (step === 1 ? router.replace("/(tabs)/home") : animateStepChange(step - 1))}>
-            <Text variant="bodySmall" color={colors.textSecondary}>
-              {t("common.back")}
+        <View style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+            <Pressable onPress={() => (step === 1 ? router.replace("/(tabs)/home") : animateStepChange(step - 1))}>
+              <Text variant="bodySmall" color={colors.textSecondary}>
+                {t("common.back")}
+              </Text>
+            </Pressable>
+            <View
+              style={{
+                marginTop: spacing.sm,
+                height: 3,
+                borderRadius: radii.full,
+                overflow: "hidden",
+                backgroundColor: colors.borderLight,
+              }}
+            >
+              <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: colors.primary }} />
+            </View>
+            <Text variant="caption" color={colors.textTertiary} style={{ marginTop: spacing.xs, textAlign: "right" }}>
+              {step} / 3
             </Text>
-          </Pressable>
-          <View
-            style={{
-              marginTop: spacing.sm,
-              height: 3,
-              borderRadius: radii.full,
-              overflow: "hidden",
-              backgroundColor: colors.borderLight,
-            }}
-          >
-            <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: colors.primary }} />
           </View>
-          <Text variant="caption" color={colors.textTertiary} style={{ marginTop: spacing.xs, textAlign: "right" }}>
-            {step} / 3
-          </Text>
-        </View>
 
-        <ScrollView
-          style={{ flex: 1, paddingHorizontal: spacing.lg }}
-          contentContainerStyle={{ paddingVertical: spacing.lg }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View style={{ opacity: fadeAnim }}>
+          <ScrollView
+            style={{ flex: 1, paddingHorizontal: spacing.lg }}
+            contentContainerStyle={{ paddingVertical: spacing.lg, paddingBottom: 120 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Animated.View style={{ opacity: fadeAnim }}>
             {step === 1 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
@@ -448,30 +454,44 @@ export default function NewEventScreen() {
                 />
               </Card>
             ) : null}
-          </Animated.View>
-        </ScrollView>
+            </Animated.View>
+          </ScrollView>
 
-        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-          {step === 3 ? (
-            <Button
-              onPress={handleCreateEvent}
-              loading={isSubmitting}
-              size="lg"
-              style={{ borderRadius: radii.xl, minHeight: 56 }}
-            >
-              Etkinliği Oluştur
-            </Button>
-          ) : (
-            <Button
-              onPress={() => {
-                if (validateStep()) animateStepChange(step + 1);
-              }}
-              size="lg"
-              style={{ borderRadius: radii.xl, minHeight: 56 }}
-            >
-              {t("common.next")}
-            </Button>
-          )}
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: spacing.lg,
+              paddingTop: spacing.sm,
+              backgroundColor: colors.background,
+            }}
+          >
+            {step === 3 ? (
+              <Button
+                onPress={handleCreateEvent}
+                loading={isSubmitting}
+                disabled={isBottomButtonDisabled}
+                size="lg"
+                style={{ borderRadius: radii.xl, minHeight: 56 }}
+              >
+                Etkinliği Oluştur
+              </Button>
+            ) : (
+              <Button
+                onPress={() => {
+                  if (validateStep()) animateStepChange(step + 1);
+                }}
+                disabled={isBottomButtonDisabled}
+                size="lg"
+                style={{ borderRadius: radii.xl, minHeight: 56 }}
+              >
+                {t("common.next")}
+              </Button>
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
