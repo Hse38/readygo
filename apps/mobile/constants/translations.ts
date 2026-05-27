@@ -10,7 +10,8 @@ export const translations = {
       error: "Hata",
     },
     auth: {
-      subtitle: "Etkinliklerini akillica planla",
+      subtitle: "Etkinliklerini akıllıca planla",
+      signInPrompt: "Devam etmek için giriş yap",
       title: "Hesabina giris yap",
       apple: "Apple ile devam et",
       google: "Google ile devam et",
@@ -155,6 +156,7 @@ export const translations = {
     },
     auth: {
       subtitle: "Plan your events smarter",
+      signInPrompt: "Sign in to continue",
       title: "Sign in to your account",
       apple: "Continue with Apple",
       google: "Continue with Google",

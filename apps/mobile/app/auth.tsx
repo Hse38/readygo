@@ -1,12 +1,20 @@
-import * as AppleAuthentication from "expo-apple-authentication";
 import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
 import { Text } from "../components/ui/Text";
 import {
   GOOGLE_CLIENT_ID_ANDROID,
@@ -19,6 +27,10 @@ import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import { isProfileComplete } from "../lib/profile";
 import { getToken, getUser, saveToken, saveUser } from "../lib/storage";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const PARTICLE_COUNT = 20;
+const GOOGLE_BUTTON_TEXT = "#1A1A2E";
 
 type AuthResponse = {
   token: string;
@@ -46,11 +58,161 @@ function isGoogleAuthConfigured(): boolean {
   return false;
 }
 
+function GoogleGIcon({ size = 22 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a6.52 6.52 0 0 1-2.82 4.28v3.57h4.57c2.7-2.5 4.28-6.18 4.28-10.57z"
+      />
+      <Path
+        fill="#34A853"
+        d="M12 23c3.24 0 5.95-1.08 7.93-2.93l-3.57-2.77c-.98.66-2.23 1.05-4.36 1.05-3.34 0-6.17-2.25-7.18-5.29H2.05v3.57A11.99 11.99 0 0 0 12 23z"
+      />
+      <Path
+        fill="#FBBC05"
+        d="M5.82 14.06A7.2 7.2 0 0 1 5.47 12c0-.72.13-1.41.35-2.06V6.37H2.05A11.99 11.99 0 0 0 1 12c0 1.94.47 3.77 1.28 5.39l3.54-2.33z"
+      />
+      <Path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.28 2.69 1.28 6.63l3.54 2.74C5.83 6.53 8.66 4.75 12 4.75z"
+      />
+    </Svg>
+  );
+}
+
+function AnimatedGradientBackground({ isDark }: { isDark: boolean }) {
+  const shift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shift, { toValue: 1, duration: 9000, useNativeDriver: true }),
+        Animated.timing(shift, { toValue: 0, duration: 9000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shift]);
+
+  const layerAOpacity = shift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] });
+  const layerBOpacity = shift.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
+
+  const darkA = ["#0F0E1A", "#1A1450", "#0F0E1A"] as const;
+  const darkB = ["#0F0E1A", "#221860", "#12102A"] as const;
+  const lightA = ["#F8F7FF", "#E4E0FF", "#F8F7FF"] as const;
+  const lightB = ["#FFFFFF", "#DDD6FE", "#F0EFF9"] as const;
+
+  const colorsA = isDark ? darkA : lightA;
+  const colorsB = isDark ? darkB : lightB;
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <LinearGradient colors={[...colorsA]} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: layerAOpacity }]}>
+        <LinearGradient colors={[...colorsA]} style={StyleSheet.absoluteFill} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} />
+      </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: layerBOpacity }]}>
+        <LinearGradient colors={[...colorsB]} style={StyleSheet.absoluteFill} start={{ x: 0.8, y: 0 }} end={{ x: 0.2, y: 1 }} />
+      </Animated.View>
+    </View>
+  );
+}
+
+function FloatingParticles({ isDark }: { isDark: boolean }) {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: PARTICLE_COUNT }, (_, index) => ({
+        id: index,
+        left: Math.random() * SCREEN_WIDTH,
+        top: Math.random() * SCREEN_HEIGHT,
+        size: 2 + Math.random() * 3.5,
+        opacity: 0.15 + Math.random() * 0.35,
+        driftX: 8 + Math.random() * 16,
+        driftY: 12 + Math.random() * 24,
+        duration: 5000 + Math.random() * 5000,
+        delay: Math.random() * 2000,
+      })),
+    []
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((particle) => (
+        <Particle key={particle.id} particle={particle} isDark={isDark} />
+      ))}
+    </View>
+  );
+}
+
+function Particle({
+  particle,
+  isDark,
+}: {
+  particle: {
+    left: number;
+    top: number;
+    size: number;
+    opacity: number;
+    driftX: number;
+    driftY: number;
+    duration: number;
+    delay: number;
+  };
+  isDark: boolean;
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(particle.delay),
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: particle.duration,
+          useNativeDriver: true,
+        }),
+        Animated.timing(progress, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [particle.delay, particle.duration, progress]);
+
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -particle.driftY],
+  });
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, particle.driftX * (particle.left > SCREEN_WIDTH / 2 ? -1 : 1)],
+  });
+  const dotOpacity = progress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [particle.opacity, particle.opacity * 1.4, particle.opacity * 0.4],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        left: particle.left,
+        top: particle.top,
+        width: particle.size,
+        height: particle.size,
+        borderRadius: particle.size,
+        backgroundColor: isDark ? "#F0EFF9" : "#7C6FF7",
+        opacity: dotOpacity,
+        transform: [{ translateX }, { translateY }],
+      }}
+    />
+  );
+}
+
 export default function AuthScreen() {
   const router = useRouter();
-  const { colors, spacing, radii, shadows, isDark } = useTheme();
+  const { colors, spacing, isDark } = useTheme();
   const { t } = useTranslation();
-  const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
 
@@ -75,7 +237,6 @@ export default function AuthScreen() {
   }, [router]);
 
   useEffect(() => {
-    AppleAuthentication.isAvailableAsync().then(setIsAppleAvailable);
     if (isGoogleAuthConfigured()) {
       GoogleSignin.configure({
         webClientId: GOOGLE_WEB_CLIENT_ID,
@@ -141,40 +302,6 @@ export default function AuthScreen() {
     router.replace(isProfileComplete(resolvedUser) ? "/(tabs)/home" : "/onboarding");
   }
 
-  async function handleAppleSignIn() {
-    try {
-      setIsLoading(true);
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      if (!credential.identityToken) throw new Error("Apple girisi basarisiz.");
-      const authResponse = await apiFetch<AuthResponse>("/auth/apple", {
-        method: "POST",
-        body: JSON.stringify({
-          identityToken: credential.identityToken,
-          fullName: {
-            givenName: credential.fullName?.givenName ?? undefined,
-            familyName: credential.fullName?.familyName ?? undefined,
-          },
-        }),
-      });
-      await completeAuth(authResponse);
-    } catch (err) {
-      const error = err as { code?: string };
-      if (error.code !== "ERR_REQUEST_CANCELED") {
-        Alert.alert(
-          t("auth.loginFailed"),
-          err instanceof Error ? err.message : t("auth.appleFailed")
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function handleGoogleSignIn() {
     try {
       setIsLoading(true);
@@ -200,88 +327,152 @@ export default function AuthScreen() {
 
   if (isCheckingToken) {
     return (
-      <SafeAreaView style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </SafeAreaView>
+      <View style={styles.root}>
+        <AnimatedGradientBackground isDark={isDark} />
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
     );
   }
 
+  const logoLight = isDark ? "#F0EFF9" : colors.text;
+  const googleConfigured = isGoogleAuthConfigured();
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ height: "40%", alignItems: "center", justifyContent: "center" }}>
-          <View style={{ position: "absolute", width: 280, height: 280, borderRadius: 999, backgroundColor: colors.primary, opacity: 0.12, top: -80 }} />
-          <View style={{ position: "absolute", width: 210, height: 210, borderRadius: 999, backgroundColor: colors.primaryLight, opacity: 0.18, top: 10, right: -30 }} />
-          <Text style={{ fontSize: 48, fontFamily: "Inter_700Bold", color: colors.textSecondary }}>
+    <View style={styles.root}>
+      <AnimatedGradientBackground isDark={isDark} />
+      <FloatingParticles isDark={isDark} />
+
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        <View style={styles.centerSection}>
+          <Text style={[styles.logo, { color: logoLight }]}>
             r
-            <Text style={{ color: colors.primary, fontSize: 48, fontFamily: "Inter_700Bold" }}>GO</Text>
+            <Text style={[styles.logo, { color: "#7C6FF7" }]}>GO</Text>
           </Text>
-          <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
+          <Text variant="body" color={colors.textSecondary} style={styles.tagline}>
             {t("auth.subtitle")}
           </Text>
         </View>
 
-        <Card
-          style={{
-            flex: 1,
-            borderTopLeftRadius: radii.xl,
-            borderTopRightRadius: radii.xl,
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-            padding: spacing.xl,
-            ...shadows.lg,
-          }}
-        >
-          <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-            {t("auth.title")}
+        <View style={[styles.bottomSection, { paddingHorizontal: spacing.xl }]}>
+          <Text variant="caption" color={colors.textSecondary} style={styles.signInLabel}>
+            {t("auth.signInPrompt")}
           </Text>
 
-          {isAppleAvailable && Platform.OS === "ios" ? (
-            <Pressable
-              onPress={handleAppleSignIn}
-              disabled={isLoading}
-              style={{
-                minHeight: 52,
-                borderRadius: radii.xl,
-                backgroundColor: isDark ? colors.surfaceElevated : colors.text,
-                borderWidth: isDark ? 1 : 0,
-                borderColor: colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: isLoading ? 0.5 : 1,
-              }}
-            >
-              <Text variant="label" color={isDark ? colors.text : colors.white}>
-                {` ${t("auth.apple")}`}
-              </Text>
-            </Pressable>
+          <Pressable
+            onPress={handleGoogleSignIn}
+            disabled={isLoading || !googleConfigured}
+            style={({ pressed }) => [
+              styles.googleButton,
+              pressed && styles.googleButtonPressed,
+              (!googleConfigured || isLoading) && styles.googleButtonDisabled,
+            ]}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={GOOGLE_BUTTON_TEXT} />
+            ) : (
+              <View style={styles.googleButtonInner}>
+                <GoogleGIcon size={22} />
+                <Text style={styles.googleButtonText}>{t("auth.google")}</Text>
+              </View>
+            )}
+          </Pressable>
+
+          {!googleConfigured ? (
+            <Text variant="caption" color={colors.textTertiary} style={styles.soonHint}>
+              {t("auth.googleSoon")}
+            </Text>
           ) : null}
 
-          <View style={{ alignItems: "center", marginVertical: spacing.md }}>
-            <Text variant="caption" color={colors.textTertiary}>
-              {t("auth.or")}
-            </Text>
-          </View>
-
-          {isGoogleAuthConfigured() ? (
-            <Button onPress={handleGoogleSignIn} disabled={isLoading} variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
-              {t("auth.google")}
-            </Button>
-          ) : (
-            <Button onPress={() => {}} disabled variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
-              {t("auth.googleSoon")}
-            </Button>
-          )}
-
-          {isLoading ? <ActivityIndicator style={{ marginTop: spacing.md }} color={colors.primary} /> : null}
-
-          <View style={{ marginTop: "auto", flexDirection: "row", justifyContent: "center" }}>
-            <Text variant="caption" color={colors.textTertiary}>
-              {`${t("auth.policy")} · ${t("auth.terms")}`}
-            </Text>
-          </View>
-        </Card>
-      </View>
-    </SafeAreaView>
+          <Text variant="caption" color={colors.textTertiary} style={styles.legalText}>
+            {`${t("auth.policy")} · ${t("auth.terms")}`}
+          </Text>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#0F0E1A",
+  },
+  safeArea: {
+    flex: 1,
+  },
+  loadingCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  centerSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  logo: {
+    fontSize: 52,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -1,
+  },
+  tagline: {
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 16,
+  },
+  bottomSection: {
+    minHeight: "35%",
+    justifyContent: "flex-end",
+    paddingBottom: 8,
+  },
+  signInLabel: {
+    textAlign: "center",
+    marginBottom: 16,
+    fontSize: 13,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: 54,
+    borderRadius: 9999,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  googleButtonPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
+  googleButtonDisabled: {
+    opacity: 0.55,
+  },
+  googleButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: GOOGLE_BUTTON_TEXT,
+  },
+  soonHint: {
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 11,
+  },
+  legalText: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+});
