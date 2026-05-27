@@ -87,7 +87,19 @@ type CreateEventResponse = {
 };
 
 type TravelTimeResponse = {
+  durationSeconds: number;
+  durationText: string;
+  distanceText: string;
   departureTime: string;
+  transitDetails?: {
+    firstDeparture: string;
+    steps: Array<{
+      type: "transit" | "walking";
+      instruction: string;
+      duration: string;
+      line?: string;
+    }>;
+  };
 };
 
 function isUser(value: object | null): value is User {
@@ -306,7 +318,8 @@ export default function NewEventScreen() {
             await scheduleLeaveHomeNotification(
               response.event.id,
               travel.departureTime,
-              response.event.title
+              response.event.title,
+              travel.transitDetails
             );
           } catch {
             // Travel notification is optional if the API call fails.

@@ -87,20 +87,68 @@ export async function cancelEventNotifications(eventId: string): Promise<void> {
   await AsyncStorage.removeItem(notificationStorageKey(eventId));
 }
 
+type TransitStep = {
+  type: "transit" | "walking";
+  instruction: string;
+  duration: string;
+  line?: string;
+};
+
+type TransitDetails = {
+  firstDeparture: string;
+  steps: TransitStep[];
+};
+
 export async function scheduleLeaveHomeNotification(
   eventId: string,
   departureTime: string,
-  eventTitle: string
+  eventTitle: string,
+  transitDetails?: TransitDetails
 ): Promise<void> {
-  const triggerDate = new Date(departureTime);
+  const walkingSeconds =
+    transitDetails?.steps
+      ?.filter((step) => step.type === "walking")
+      .map((step) => {
+        const match = step.duration.match(/(\d+)/);
+        return match ? Number.parseInt(match[1], 10) * 60 : 0;
+      })
+      .reduce((acc, value) => acc + value, 0) ?? 0;
+
+  const transitBase = transitDetails?.firstDeparture
+    ? new Date(transitDetails.firstDeparture).getTime()
+    : null;
+  const defaultBase = new Date(departureTime).getTime();
+  const baseMs = transitBase ?? defaultBase;
+  const triggerDate = new Date(
+    transitBase ? baseMs - walkingSeconds * 1000 : baseMs
+  );
+
   if (Number.isNaN(triggerDate.getTime()) || triggerDate.getTime() <= Date.now()) {
     return;
   }
 
+  const firstLine = transitDetails?.steps?.find(
+    (step) => step.type === "transit" && step.line
+  )?.line;
+  const firstDepartureLabel = transitDetails?.firstDeparture
+    ? new Date(transitDetails.firstDeparture).toLocaleTimeString("tr-TR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  const title = transitDetails?.firstDeparture
+    ? "Otobüse yetişmek için çık! 🚌"
+    : "Yola çıkma zamanı! 🚀";
+  const body =
+    transitDetails?.firstDeparture && firstDepartureLabel
+      ? `İlk sefer: ${firstDepartureLabel}${firstLine ? ` — ${firstLine}` : ""}`
+      : `${eventTitle} için evden çıkman gerekiyor`;
+
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
-      title: "Yola çıkma zamanı! 🚀",
-      body: `${eventTitle} için evden çıkman gerekiyor`,
+      title,
+      body,
       data: { eventId },
     },
     trigger: {

@@ -41,7 +41,9 @@ export async function getTravelTime(req: Request, res: Response): Promise<void> 
     res.json({
       durationSeconds: travel.durationSeconds,
       durationText: travel.durationText,
+      distanceText: travel.distanceText,
       departureTime: departureTime.toISOString(),
+      transitDetails: travel.transitDetails,
     });
   } catch (err) {
     console.error("Get travel time error:", err);
