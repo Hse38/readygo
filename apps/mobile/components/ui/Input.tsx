@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { TextInput, View, type StyleProp, type TextInputProps, type TextStyle } from "react-native";
+import {
+  Platform,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type TextStyle,
+} from "react-native";
 
 import { useTheme } from "../../hooks/useTheme";
 import { Text } from "./Text";
@@ -26,6 +33,8 @@ export function Input({
   const { colors, radii, spacing, typography } = useTheme();
   const [focused, setFocused] = useState(false);
 
+  const borderColor = error ? colors.error : focused ? colors.primary : colors.border;
+
   return (
     <View style={{ marginBottom: spacing.md }}>
       {label ? (
@@ -42,13 +51,13 @@ export function Input({
         multiline={multiline}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        selectionColor={colors.primary}
+        cursorColor={colors.primary}
+        underlineColorAndroid="transparent"
         style={[
           {
             borderWidth: 1,
-            borderColor: error ? colors.error : focused ? colors.primary : colors.border,
             borderRadius: radii.md,
-            backgroundColor: colors.surface,
-            color: colors.text,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
             minHeight: multiline ? 100 : 48,
@@ -56,8 +65,14 @@ export function Input({
             fontFamily: typography.fonts.regular,
             fontSize: typography.sizes.md,
             width: "100%",
+            ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
           },
           inputStyle,
+          {
+            backgroundColor: colors.surface,
+            color: colors.text,
+            borderColor,
+          },
         ]}
       />
       {error ? (

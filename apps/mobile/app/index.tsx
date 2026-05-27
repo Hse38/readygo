@@ -2,13 +2,17 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+import type { User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
 import { apiFetch } from "../lib/api";
 import { isProfileComplete } from "../lib/profile";
-import { getToken, saveUser } from "../lib/storage";
-import type { User } from "../constants/types";
+import { getToken, getUser, saveUser } from "../lib/storage";
 
 type ProfileResponse = { user: User };
+
+function isUser(value: unknown): value is User {
+  return !!value && typeof value === "object" && "id" in value;
+}
 
 export default function Index() {
   const { colors } = useTheme();
@@ -16,7 +20,8 @@ export default function Index() {
 
   useEffect(() => {
     async function resolveRoute() {
-      const token = await getToken();
+      const token = (await getToken())?.trim() ?? null;
+
       if (!token) {
         setHref("/auth");
         return;
@@ -26,11 +31,19 @@ export default function Index() {
         const response = await apiFetch<ProfileResponse>("/profile", {}, token);
         await saveUser(response.user);
         setHref(isProfileComplete(response.user) ? "/(tabs)/home" : "/onboarding");
+        return;
       } catch (error) {
         if (error instanceof Error && error.message === "AUTH_SESSION_INVALID") {
           setHref("/auth");
           return;
         }
+
+        const cached = await getUser();
+        if (isUser(cached)) {
+          setHref(isProfileComplete(cached) ? "/(tabs)/home" : "/onboarding");
+          return;
+        }
+
         setHref("/onboarding");
       }
     }

@@ -1,6 +1,6 @@
 import { IconMapPin, IconX } from "@tabler/icons-react-native";
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type StyleProp, type TextStyle } from "react-native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 
 import { GOOGLE_PLACES_API_KEY } from "../../constants/config";
@@ -17,6 +17,7 @@ type Props = {
   label: string;
   placeholder?: string;
   value: string;
+  inputStyle?: StyleProp<TextStyle>;
   onLocationSelect: (location: SelectedLocation) => void;
 };
 
@@ -24,9 +25,18 @@ export function LocationInput({
   label,
   placeholder,
   value,
+  inputStyle,
   onLocationSelect,
 }: Props) {
   const { colors, radii, spacing, typography } = useTheme();
+  const containerRadius =
+    (inputStyle && typeof inputStyle === "object" && "borderRadius" in inputStyle
+      ? inputStyle.borderRadius
+      : undefined) ?? radii.md;
+  const inputHeight =
+    (inputStyle && typeof inputStyle === "object" && "minHeight" in inputStyle
+      ? inputStyle.minHeight
+      : undefined) ?? 48;
   const [queryText, setQueryText] = useState(value);
 
   useEffect(() => {
@@ -50,6 +60,9 @@ export function LocationInput({
           value: queryText,
           onChangeText: setQueryText,
           placeholderTextColor: colors.textTertiary,
+          selectionColor: colors.primary,
+          cursorColor: colors.primary,
+          underlineColorAndroid: "transparent",
         }}
         onPress={(data, details) => {
           const lat = details?.geometry?.location?.lat ?? 0;
@@ -64,16 +77,20 @@ export function LocationInput({
           textInputContainer: {
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: radii.md,
+            borderRadius: containerRadius,
             backgroundColor: colors.surface,
             paddingHorizontal: spacing.sm,
           },
           textInput: {
-            height: 48,
+            height: typeof inputHeight === "number" ? inputHeight : 48,
             color: colors.text,
             fontSize: typography.sizes.md,
             fontFamily: typography.fonts.regular,
             backgroundColor: colors.surface,
+            borderWidth: 0,
+          },
+          predefinedPlacesDescription: {
+            color: colors.text,
           },
           listView: {
             borderWidth: 1,

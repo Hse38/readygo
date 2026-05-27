@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
@@ -86,11 +87,24 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
   const { t } = useTranslation();
+  const [authChecked, setAuthChecked] = useState(false);
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(INITIAL_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
+
+  useEffect(() => {
+    async function ensureAuthenticated() {
+      const token = (await getToken())?.trim();
+      if (!token) {
+        router.replace("/auth");
+        return;
+      }
+      setAuthChecked(true);
+    }
+    void ensureAuthenticated();
+  }, [router]);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -192,6 +206,16 @@ export default function OnboardingScreen() {
     t("onboarding.step4Title"),
     t("onboarding.step5Title"),
   ];
+
+  if (!authChecked) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
@@ -300,6 +324,7 @@ export default function OnboardingScreen() {
                     label={t("onboarding.workLocation")}
                     value={data.workLocation}
                     placeholder={t("onboarding.workPlaceholder")}
+                    inputStyle={{ minHeight: 52, borderRadius: radii.xl }}
                     onLocationSelect={({ address, lat, lng }) => {
                       updateField("workLocation", address);
                       updateField("workLocationLat", address ? lat : null);
@@ -392,6 +417,7 @@ export default function OnboardingScreen() {
                     label={t("onboarding.homeAddress")}
                     value={data.homeLocation}
                     placeholder={t("onboarding.homePlaceholder")}
+                    inputStyle={{ minHeight: 52, borderRadius: radii.xl }}
                     onLocationSelect={({ address, lat, lng }) => {
                       updateField("homeLocation", address);
                       updateField("homeLocationLat", address ? lat : null);
