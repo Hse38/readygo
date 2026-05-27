@@ -47,9 +47,9 @@ const EVENT_TYPES: Record<string, { emoji: string; label: string }> = {
 };
 
 const TRANSPORT_LABELS: Record<string, string> = {
-  walking: "Yuruyus",
-  transit: "Toplu tasima",
-  driving: "Arac",
+  walking: "Yürüyüş",
+  transit: "Toplu Taşıma",
+  driving: "Araç",
   cycling: "Bisiklet",
 };
 

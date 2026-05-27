@@ -1,9 +1,8 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { IconCalendar, IconClock, IconMapPin } from "@tabler/icons-react-native";
+import { IconCalendar, IconClock, IconMapPin, IconRoute } from "@tabler/icons-react-native";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
@@ -31,21 +30,24 @@ import {
 import { getToken, getUser } from "../lib/storage";
 
 const EVENT_TYPES = [
-  { value: "flight", emoji: "✈️", label: "Ucus" },
-  { value: "exam", emoji: "📝", label: "Sinav" },
-  { value: "wedding", emoji: "💍", label: "Dugun" },
-  { value: "doctor", emoji: "🏥", label: "Doktor" },
-  { value: "meeting", emoji: "👔", label: "Toplanti" },
-  { value: "concert", emoji: "🎵", label: "Konser" },
-  { value: "travel", emoji: "🧳", label: "Seyahat" },
-  { value: "sport", emoji: "🏋️", label: "Spor" },
-  { value: "birthday", emoji: "🎂", label: "Dogum" },
+  { value: "flight", emoji: "✈️", label: "Uçuş", color: "#EEF2FF" },
+  { value: "exam", emoji: "📝", label: "Sınav", color: "#F0FDF4" },
+  { value: "wedding", emoji: "💍", label: "Düğün", color: "#FDF4FF" },
+  { value: "doctor", emoji: "🏥", label: "Doktor", color: "#FFF1F2" },
+  { value: "meeting", emoji: "👔", label: "Toplantı", color: "#FFFBEB" },
+  { value: "concert", emoji: "🎵", label: "Konser", color: "#F0F9FF" },
+  { value: "travel", emoji: "🧳", label: "Seyahat", color: "#FFF7ED" },
+  { value: "sport", emoji: "🏋️", label: "Spor", color: "#F0FDF4" },
+  { value: "birthday", emoji: "🎂", label: "Doğum", color: "#FDF4FF" },
+  { value: "ceremony", emoji: "🎓", label: "Tören", color: "#FFFBEB" },
+  { value: "legal", emoji: "⚖️", label: "Resmi", color: "#F8FAFC" },
+  { value: "other", emoji: "📌", label: "Diğer", color: "#F8F8F8" },
 ] as const;
 
 const TRANSPORT_MODES = [
-  { icon: "🚶", label: "Yuruyus", value: "walking" },
-  { icon: "🚌", label: "Toplu Tasima", value: "transit" },
-  { icon: "🚗", label: "Arac", value: "driving" },
+  { icon: "🚶", label: "Yürüyüş", value: "walking" },
+  { icon: "🚌", label: "Toplu Taşıma", value: "transit" },
+  { icon: "🚗", label: "Araç", value: "driving" },
   { icon: "🚲", label: "Bisiklet", value: "cycling" },
 ] as const;
 
@@ -84,8 +86,8 @@ function combineDateAndTime(date: Date, time: Date): Date {
   return combined;
 }
 
-function formatDate(date: Date, locale: "tr" | "en"): string {
-  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("tr-TR", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -98,8 +100,8 @@ function formatTime(date: Date): string {
 
 export default function NewEventScreen() {
   const router = useRouter();
-  const { colors, spacing, radii } = useTheme();
-  const { t, locale } = useTranslation();
+  const { colors, spacing, radii, shadows } = useTheme();
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -124,7 +126,7 @@ export default function NewEventScreen() {
         setForm((prev) => ({ ...prev, travelMode: stored.transportMode as TransportMode }));
       }
     }
-    loadDefaultTransport();
+    void loadDefaultTransport();
   }, []);
 
   function updateForm<K extends keyof FormData>(key: K, value: FormData[K]) {
@@ -200,21 +202,23 @@ export default function NewEventScreen() {
       }
       router.replace(`/event/${response.event.id}`);
     } catch (err) {
-      Alert.alert(
-        t("common.error"),
-        err instanceof Error ? err.message : t("newEvent.createFailed")
-      );
+      Alert.alert(t("common.error"), err instanceof Error ? err.message : t("newEvent.createFailed"));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   const progress = step / 3;
+  const selectedType = useMemo(
+    () => EVENT_TYPES.find((entry) => entry.value === form.type) ?? EVENT_TYPES[EVENT_TYPES.length - 1],
+    [form.type]
+  );
+  const selectedTransport = TRANSPORT_MODES.find((mode) => mode.value === form.travelMode);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
           <Pressable onPress={() => (step === 1 ? router.replace("/(tabs)/home") : animateStepChange(step - 1))}>
             <Text variant="bodySmall" color={colors.textSecondary}>
               {t("common.back")}
@@ -236,7 +240,11 @@ export default function NewEventScreen() {
           </Text>
         </View>
 
-        <ScrollView style={{ flex: 1, paddingHorizontal: spacing.xl }} contentContainerStyle={{ paddingVertical: spacing.lg }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={{ flex: 1, paddingHorizontal: spacing.lg }}
+          contentContainerStyle={{ paddingVertical: spacing.lg }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Animated.View style={{ opacity: fadeAnim }}>
             {step === 1 ? (
               <>
@@ -252,19 +260,29 @@ export default function NewEventScreen() {
                         onPress={() => updateForm("type", item.value)}
                         style={{
                           width: "31%",
-                          aspectRatio: 1,
                           borderRadius: radii.lg,
                           borderWidth: selected ? 2 : 1,
                           borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
+                          backgroundColor: colors.surface,
                           alignItems: "center",
-                          justifyContent: "center",
-                          padding: spacing.sm,
+                          paddingVertical: spacing.md,
+                          paddingHorizontal: spacing.xs,
                         }}
                       >
-                        <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
-                        <Text variant="caption" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                          {t(`newEvent.eventTypes.${item.value}`)}
+                        <View
+                          style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: radii.lg,
+                            backgroundColor: item.color,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 30 }}>{item.emoji}</Text>
+                        </View>
+                        <Text variant="caption" style={{ marginTop: spacing.sm, textAlign: "center" }}>
+                          {item.label}
                         </Text>
                       </Pressable>
                     );
@@ -281,28 +299,48 @@ export default function NewEventScreen() {
                 <Input
                   label={t("newEvent.title")}
                   value={form.title}
-                  onChangeText={(t) => updateForm("title", t)}
+                  onChangeText={(value) => updateForm("title", value)}
                   placeholder={t("newEvent.titlePlaceholder")}
                 />
 
                 <Card style={{ marginBottom: spacing.md }}>
-                  <Pressable onPress={() => setShowDatePicker(true)} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: spacing.sm }}>
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: spacing.sm,
+                    }}
+                  >
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <IconCalendar size={18} color={colors.textSecondary} />
                       <Text variant="body" style={{ marginLeft: spacing.sm }}>
-                        {formatDate(form.eventDate, locale)}
+                        {formatDate(form.eventDate)}
                       </Text>
                     </View>
-                    <Text variant="bodySmall" color={colors.textTertiary}>›</Text>
+                    <Text variant="bodySmall" color={colors.textTertiary}>
+                      ›
+                    </Text>
                   </Pressable>
-                  <Pressable onPress={() => setShowTimePicker(true)} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: spacing.sm }}>
+                  <Pressable
+                    onPress={() => setShowTimePicker(true)}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: spacing.sm,
+                    }}
+                  >
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <IconClock size={18} color={colors.textSecondary} />
                       <Text variant="body" style={{ marginLeft: spacing.sm }}>
                         {formatTime(form.eventTime)}
                       </Text>
                     </View>
-                    <Text variant="bodySmall" color={colors.textTertiary}>›</Text>
+                    <Text variant="bodySmall" color={colors.textTertiary}>
+                      ›
+                    </Text>
                   </Pressable>
                 </Card>
 
@@ -343,7 +381,7 @@ export default function NewEventScreen() {
                 />
 
                 <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  {t("newEvent.transport")}
+                  Ulaşım
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -366,7 +404,7 @@ export default function NewEventScreen() {
                         >
                           <Text>{mode.icon}</Text>
                           <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
-                            {t(`onboarding.transportModes.${mode.value}`)}
+                            {mode.label}
                           </Text>
                         </Pressable>
                       );
@@ -377,27 +415,51 @@ export default function NewEventScreen() {
             ) : null}
 
             {step === 3 ? (
-              <Card>
-                <View style={{ alignItems: "center", marginBottom: spacing.md }}>
-                  <Text style={{ fontSize: 48 }}>
-                    {EVENT_TYPES.find((e) => e.value === form.type)?.emoji ?? "📌"}
-                  </Text>
-                  <Text variant="h1" style={{ marginTop: spacing.sm, textAlign: "center" }}>
-                    {form.title || t("profile.events")}
+              <Card
+                style={{
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.borderLight,
+                  ...shadows.sm,
+                }}
+              >
+                <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
+                  <View
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: radii.full,
+                      backgroundColor: selectedType.color,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 38 }}>{selectedType.emoji}</Text>
+                  </View>
+                  <Text variant="h1" style={{ marginTop: spacing.md, textAlign: "center" }}>
+                    {form.title || "Etkinlik"}
                   </Text>
                 </View>
-                <DetailRow icon={<IconCalendar size={16} color={colors.textSecondary} />} label={formatDate(form.eventDate, locale)} />
-                <DetailRow icon={<IconClock size={16} color={colors.textSecondary} />} label={formatTime(form.eventTime)} />
-                <DetailRow icon={<IconMapPin size={16} color={colors.textSecondary} />} label={form.location || "-"} />
+                <DetailRow icon={<IconCalendar size={17} color={colors.textSecondary} />} label={formatDate(form.eventDate)} />
+                <DetailRow icon={<IconClock size={17} color={colors.textSecondary} />} label={formatTime(form.eventTime)} />
+                <DetailRow icon={<IconMapPin size={17} color={colors.textSecondary} />} label={form.location || "-"} />
+                <DetailRow
+                  icon={<IconRoute size={17} color={colors.textSecondary} />}
+                  label={selectedTransport?.label || "-"}
+                />
               </Card>
             ) : null}
           </Animated.View>
         </ScrollView>
 
-        <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
           {step === 3 ? (
-            <Button onPress={handleCreateEvent} loading={isSubmitting} size="lg" style={{ borderRadius: radii.xl }}>
-              {t("newEvent.create")}
+            <Button
+              onPress={handleCreateEvent}
+              loading={isSubmitting}
+              size="lg"
+              style={{ borderRadius: radii.xl, minHeight: 56 }}
+            >
+              Etkinliği Oluştur
             </Button>
           ) : (
             <Button
@@ -405,7 +467,7 @@ export default function NewEventScreen() {
                 if (validateStep()) animateStepChange(step + 1);
               }}
               size="lg"
-              style={{ borderRadius: radii.xl }}
+              style={{ borderRadius: radii.xl, minHeight: 56 }}
             >
               {t("common.next")}
             </Button>
@@ -417,11 +479,18 @@ export default function NewEventScreen() {
 }
 
 function DetailRow({ icon, label }: { icon: ReactNode; label: string }) {
-  const { spacing } = useTheme();
+  const { spacing, colors } = useTheme();
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: spacing.sm,
+        paddingVertical: spacing.xs,
+      }}
+    >
       {icon}
-      <Text variant="body" style={{ marginLeft: spacing.sm }}>
+      <Text variant="body" color={colors.textSecondary} style={{ marginLeft: spacing.sm, flex: 1 }}>
         {label}
       </Text>
     </View>

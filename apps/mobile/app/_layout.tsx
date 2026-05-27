@@ -14,6 +14,7 @@ import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { Linking } from "react-native";
+import { ThemeProvider, useDarkMode } from "../context/ThemeContext";
 
 import {
   configureNotificationHandler,
@@ -24,8 +25,9 @@ import { initI18n } from "../lib/i18n";
 configureNotificationHandler();
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const router = useRouter();
+  const { isDark } = useDarkMode();
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -93,7 +95,15 @@ export default function RootLayout() {
         <Stack.Screen name="event/[id]" />
         <Stack.Screen name="invite/[token]" />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
   );
 }

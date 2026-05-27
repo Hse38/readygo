@@ -11,7 +11,7 @@ import {
   IconSparkles,
   IconUsers,
 } from "@tabler/icons-react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -49,6 +49,23 @@ const DEFAULT_EVENT_STYLE: EventTypeStyle = {
   Icon: IconCalendar,
 };
 
+const WEEKDAY_SHORT_TR = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const WEEKDAY_LONG_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const MONTHS_TR = [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+];
+
 function isUser(value: object | null): value is User {
   return !!value && typeof value === "object" && "name" in value;
 }
@@ -75,13 +92,10 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-function formatSelectedDay(date: Date, locale: "tr" | "en"): string {
-  const localeTag = locale === "tr" ? "tr-TR" : "en-US";
-  return new Intl.DateTimeFormat(localeTag, {
-    day: "numeric",
-    month: "long",
-    weekday: "long",
-  }).format(date);
+function formatSelectedDayTr(date: Date): string {
+  const jsDay = date.getDay();
+  const mondayFirstIndex = jsDay === 0 ? 6 : jsDay - 1;
+  return `${date.getDate()} ${MONTHS_TR[date.getMonth()]} ${WEEKDAY_LONG_TR[mondayFirstIndex]}`;
 }
 
 function formatEventMeta(dateStr: string, location?: string): string {
@@ -93,17 +107,14 @@ function formatEventMeta(dateStr: string, location?: string): string {
   return location ? `${time} · ${location}` : time;
 }
 
-function getDaysRemainingLabel(
-  dateStr: string,
-  t: (key: string) => string
-): string {
+function getDaysRemainingLabel(dateStr: string, t: (key: string) => string): string {
   const today = startOfDay(new Date());
   const eventDate = startOfDay(new Date(dateStr));
   const diffMs = eventDate.getTime() - today.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays === 0) return t("home.today");
   if (diffDays < 0) return t("home.passed");
-  return `${diffDays} ${t("home.days")}`;
+  return `${diffDays} gün`;
 }
 
 function getEventTypeStyle(type: string): EventTypeStyle {
@@ -131,8 +142,9 @@ function getNearestEventWithChecklist(events: Event[]): Event | null {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { date } = useLocalSearchParams<{ date?: string }>();
   const { colors, spacing, radii, shadows } = useTheme();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [events, setEvents] = useState<Event[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,6 +152,15 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
   const [weekStart, setWeekStart] = useState(getMonday(new Date()));
+
+  useEffect(() => {
+    if (!date) return;
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) return;
+    const normalized = startOfDay(parsed);
+    setSelectedDate(normalized);
+    setWeekStart(getMonday(normalized));
+  }, [date]);
 
   const nearestEvent = useMemo(() => getNearestEventWithChecklist(events), [events]);
   const weekDays = useMemo(() => {
@@ -174,7 +195,7 @@ export default function HomeScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     async function loadInitialData() {
@@ -182,7 +203,7 @@ export default function HomeScreen() {
       setUser(isUser(storedUser) ? storedUser : null);
       await fetchEvents();
     }
-    loadInitialData();
+    void loadInitialData();
   }, [fetchEvents]);
 
   async function handleToggleChecklistItem(itemId: string, eventId: string) {
@@ -246,7 +267,7 @@ export default function HomeScreen() {
           <ChecklistPreviewItem
             key={item.id}
             item={item}
-            onToggle={() => handleToggleChecklistItem(item.id, event.id)}
+            onToggle={() => void handleToggleChecklistItem(item.id, event.id)}
           />
         ))}
       </View>
@@ -266,7 +287,7 @@ export default function HomeScreen() {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          paddingHorizontal: spacing.xl,
+          paddingHorizontal: spacing.lg,
           paddingTop: spacing.sm,
           paddingBottom: spacing.lg,
         }}
@@ -294,12 +315,12 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView
-        style={{ flex: 1, paddingHorizontal: spacing.xl }}
+        style={{ flex: 1, paddingHorizontal: spacing.lg }}
         contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => fetchEvents(true)}
+            onRefresh={() => void fetchEvents(true)}
             tintColor={colors.primary}
             colors={[colors.primary]}
           />
@@ -308,7 +329,7 @@ export default function HomeScreen() {
       >
         <View
           style={{
-            marginBottom: spacing.lg,
+            marginBottom: spacing.md,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -318,7 +339,7 @@ export default function HomeScreen() {
             <IconChevronLeft color={colors.textSecondary} size={20} />
           </Pressable>
           <Text variant="label" color={colors.textSecondary}>
-            {t("home.weekView")}
+            {`${weekDays[0].getDate()} ${MONTHS_TR[weekDays[0].getMonth()]} - ${weekDays[6].getDate()} ${MONTHS_TR[weekDays[6].getMonth()]}`}
           </Text>
           <Pressable onPress={() => moveWeek("next")} hitSlop={10}>
             <IconChevronRight color={colors.textSecondary} size={20} />
@@ -331,7 +352,7 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.toISOString()}
           contentContainerStyle={{ gap: spacing.sm, marginBottom: spacing.xl }}
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item, index }) => {
+          renderItem={({ item }) => {
             const dayEvents = events.filter((event) => sameDay(new Date(event.date), item));
             const isToday = sameDay(item, new Date());
             const isSelected = sameDay(item, selectedDate);
@@ -341,6 +362,7 @@ export default function HomeScreen() {
                 ? colors.primaryLight
                 : colors.backgroundSecondary;
             const txtColor = isToday || isSelected ? colors.white : colors.text;
+            const dayIndex = item.getDay() === 0 ? 6 : item.getDay() - 1;
             return (
               <Pressable
                 onPress={() => setSelectedDate(item)}
@@ -353,9 +375,7 @@ export default function HomeScreen() {
                 }}
               >
                 <Text variant="caption" color={txtColor}>
-                  {new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
-                    weekday: "short",
-                  }).format(item)}
+                  {WEEKDAY_SHORT_TR[dayIndex]}
                 </Text>
                 <Text variant="label" color={txtColor} style={{ marginTop: 2 }}>
                   {item.getDate()}
@@ -379,7 +399,7 @@ export default function HomeScreen() {
         />
 
         <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-          {formatSelectedDay(selectedDate, locale)}
+          {formatSelectedDayTr(selectedDate)}
         </Text>
 
         {isLoading ? (
@@ -394,7 +414,25 @@ export default function HomeScreen() {
           </View>
         ) : selectedDayEvents.length === 0 ? (
           <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
-            <Text style={{ fontSize: 42 }}>🗓️</Text>
+            <View
+              style={{
+                width: 108,
+                height: 108,
+                borderRadius: 24,
+                backgroundColor: "#F3F0FF",
+                borderWidth: 2,
+                borderColor: "#D7CEFF",
+                padding: 14,
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#7C6FF7" }} />
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#7C6FF7" }} />
+              </View>
+              <View style={{ flex: 1, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: "#7C6FF7", fontSize: 28, fontFamily: "Inter_700Bold" }}>+</Text>
+              </View>
+            </View>
             <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md }}>
               {t("home.noEvent")}
             </Text>
@@ -440,11 +478,7 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Badge
-                    variant="primary"
-                    size="sm"
-                    label={getDaysRemainingLabel(event.date, t)}
-                  />
+                  <Badge variant="primary" size="sm" label={getDaysRemainingLabel(event.date, t)} />
                 </Card>
                 {showChecklist ? renderChecklistPreview(event) : null}
               </View>
@@ -457,7 +491,7 @@ export default function HomeScreen() {
         onPress={() => router.push("/new-event")}
         style={{
           position: "absolute",
-          right: spacing.xl,
+          right: spacing.lg,
           bottom: spacing.xxl,
           height: 56,
           width: 56,

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as Updates from "expo-updates";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -22,28 +23,46 @@ import { Input } from "../../components/ui/Input";
 import { LocationInput } from "../../components/ui/LocationInput";
 import { Text } from "../../components/ui/Text";
 import type { Event, User } from "../../constants/types";
+import { useDarkMode } from "../../context/ThemeContext";
 import { useTheme } from "../../hooks/useTheme";
 import { apiFetch } from "../../lib/api";
-import { clearAll, getToken, getUser, saveUser } from "../../lib/storage";
 import { useTranslation } from "../../lib/i18n";
+import { clearAll, getToken, getUser, saveUser } from "../../lib/storage";
 
 const PROFILE_PHOTO_KEY = "profile_photo_base64";
 
 const WEEKDAYS = [
   { label: "Pzt", value: "monday" },
   { label: "Sal", value: "tuesday" },
-  { label: "Car", value: "wednesday" },
+  { label: "Çar", value: "wednesday" },
   { label: "Per", value: "thursday" },
   { label: "Cum", value: "friday" },
   { label: "Cmt", value: "saturday" },
   { label: "Paz", value: "sunday" },
 ] as const;
 
+const WEEKDAY_LABELS_TR: Record<string, string> = {
+  monday: "Pazartesi",
+  tuesday: "Salı",
+  wednesday: "Çarşamba",
+  thursday: "Perşembe",
+  friday: "Cuma",
+  saturday: "Cumartesi",
+  sunday: "Pazar",
+};
+
+const TRANSPORT_LABELS_TR: Record<string, string> = {
+  transit: "Toplu Taşıma",
+  walking: "Yürüyüş",
+  driving: "Araç",
+  cycling: "Bisiklet",
+};
+
 const TRANSPORT_MODES = [
-  { icon: "🚶", label: "Yuruyus", value: "walking" },
-  { icon: "🚌", label: "Toplu Tasima", value: "transit" },
-  { icon: "🚗", label: "Arac", value: "driving" },
-  { icon: "🚲", label: "Bisiklet", value: "cycling" },
+  { icon: "🚶", value: "walking" },
+  { icon: "🚌", value: "transit" },
+  { icon: "🚗", value: "driving" },
+  { icon: "🚲", value: "cycling" },
 ] as const;
 
 type EventsResponse = { events: Event[] };
@@ -86,7 +105,8 @@ function toEditableProfile(user: User | null): EditableProfile {
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
-  const { t } = useTranslation();
+  const { locale, setLanguage, t } = useTranslation();
+  const { isDark, setDarkMode } = useDarkMode();
 
   const [user, setUser] = useState<User | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -95,7 +115,6 @@ export default function ProfileScreen() {
   const [eventCount, setEventCount] = useState(0);
   const [completedTasks, setCompletedTasks] = useState(0);
   const [upcomingEvents, setUpcomingEvents] = useState(0);
-  const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [form, setForm] = useState<EditableProfile>(toEditableProfile(null));
@@ -125,9 +144,7 @@ export default function ProfileScreen() {
             .length
         );
         const now = Date.now();
-        setUpcomingEvents(
-          events.filter((event) => new Date(event.date).getTime() >= now).length
-        );
+        setUpcomingEvents(events.filter((event) => new Date(event.date).getTime() >= now).length);
       } catch {
         setEventCount(0);
         setCompletedTasks(0);
@@ -184,10 +201,7 @@ export default function ProfileScreen() {
   function handleAvatarPress() {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Iptal", "Kamera", "Galeri"],
-          cancelButtonIndex: 0,
-        },
+        { options: ["İptal", "Kamera", "Galeri"], cancelButtonIndex: 0 },
         (index) => {
           if (index === 1) void handlePickFromCamera();
           if (index === 2) void handlePickFromGallery();
@@ -196,10 +210,10 @@ export default function ProfileScreen() {
       return;
     }
 
-    Alert.alert("Profil Fotografi", "Secim yap", [
+    Alert.alert("Profil Fotoğrafı", "Seçim yap", [
       { text: "Kamera", onPress: () => void handlePickFromCamera() },
       { text: "Galeri", onPress: () => void handlePickFromGallery() },
-      { text: "Iptal", style: "cancel" },
+      { text: "İptal", style: "cancel" },
     ]);
   }
 
@@ -207,7 +221,7 @@ export default function ProfileScreen() {
     setIsSaving(true);
     try {
       const token = await getToken();
-      if (!token) throw new Error("Oturum bulunamadi.");
+      if (!token) throw new Error("Oturum bulunamadı.");
 
       const payload = {
         name: form.name.trim(),
@@ -225,10 +239,7 @@ export default function ProfileScreen() {
 
       const response = await apiFetch<ProfileResponse>(
         "/profile",
-        {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        },
+        { method: "PUT", body: JSON.stringify(payload) },
         token
       );
 
@@ -236,10 +247,7 @@ export default function ProfileScreen() {
       await saveUser(response.user);
       setIsEditOpen(false);
     } catch (err) {
-      Alert.alert(
-        t("common.error"),
-        err instanceof Error ? err.message : "Profil guncellenemedi."
-      );
+      Alert.alert(t("common.error"), err instanceof Error ? err.message : "Profil güncellenemedi.");
     } finally {
       setIsSaving(false);
     }
@@ -249,6 +257,12 @@ export default function ProfileScreen() {
     await clearAll();
     await saveProfilePhoto(null);
     router.replace("/onboarding");
+  }
+
+  async function handleLanguageChange(nextLocale: "tr" | "en") {
+    if (nextLocale === locale) return;
+    await setLanguage(nextLocale);
+    await Updates.reloadAsync();
   }
 
   function toggleWorkDay(value: string) {
@@ -278,7 +292,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
-        style={{ flex: 1, paddingHorizontal: spacing.xl }}
+        style={{ flex: 1, paddingHorizontal: spacing.lg }}
         contentContainerStyle={{ paddingBottom: spacing.xxl, paddingTop: spacing.lg }}
       >
         <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
@@ -302,10 +316,10 @@ export default function ProfileScreen() {
               </Text>
             )}
           </Pressable>
-          <Text variant="h3" style={{ marginTop: spacing.sm }}>
+          <Text variant="h3" style={{ marginTop: spacing.sm, textAlign: "center" }}>
             {`${user?.name ?? ""} ${user?.surname ?? ""}`.trim() || t("profile.user")}
           </Text>
-          <Text variant="bodySmall" color={colors.textSecondary}>
+          <Text variant="bodySmall" color={colors.textSecondary} style={{ textAlign: "center" }}>
             {user?.occupation || t("profile.professionMissing")}
           </Text>
         </View>
@@ -335,17 +349,54 @@ export default function ProfileScreen() {
           <InfoRow label={t("profile.occupation")} value={user?.occupation} />
           <InfoRow label={t("profile.workLocation")} value={user?.workLocation} />
           <InfoRow label={t("profile.homeLocation")} value={user?.homeLocation} />
-          <InfoRow label={t("profile.workDays")} value={user?.workDays?.join(", ")} />
-          <InfoRow label={t("profile.transport")} value={user?.transportMode} />
+          <InfoRow
+            label={t("profile.workDays")}
+            value={(user?.workDays ?? []).map((day) => WEEKDAY_LABELS_TR[day] ?? day).join(", ")}
+          />
+          <InfoRow
+            label={t("profile.transport")}
+            value={TRANSPORT_LABELS_TR[user?.transportMode ?? ""] ?? user?.transportMode}
+          />
         </Card>
 
         <Card style={{ marginBottom: spacing.md }}>
+          <SettingRow label={t("profile.language")}>
+            <View style={{ flexDirection: "row", gap: spacing.xs }}>
+              <Pressable
+                onPress={() => void handleLanguageChange("tr")}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                  borderRadius: radii.full,
+                  backgroundColor: locale === "tr" ? colors.primary : colors.backgroundSecondary,
+                }}
+              >
+                <Text variant="label" color={locale === "tr" ? colors.white : colors.textSecondary}>
+                  TR
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleLanguageChange("en")}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                  borderRadius: radii.full,
+                  backgroundColor: locale === "en" ? colors.primary : colors.backgroundSecondary,
+                }}
+              >
+                <Text variant="label" color={locale === "en" ? colors.white : colors.textSecondary}>
+                  EN
+                </Text>
+              </Pressable>
+            </View>
+          </SettingRow>
+
           <SettingRow label={t("profile.darkMode")}>
             <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
+              value={isDark}
+              onValueChange={(value) => void setDarkMode(value)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={darkMode ? colors.primary : colors.surface}
+              thumbColor={isDark ? colors.primary : colors.surface}
             />
           </SettingRow>
           <SettingRow label={t("profile.notifications")}>
@@ -358,25 +409,29 @@ export default function ProfileScreen() {
           </SettingRow>
         </Card>
 
-        <View style={{ gap: spacing.sm }}>
-          <Button size="lg" onPress={() => setIsEditOpen(true)}>
-            Profili Duzenle
-          </Button>
-          <Button variant="danger" size="lg" onPress={handleLogout}>
-            {t("profile.logout")}
-          </Button>
-        </View>
+        <Button size="lg" onPress={() => setIsEditOpen(true)} style={{ marginBottom: spacing.md }}>
+          Profili Düzenle
+        </Button>
+
+        <Button
+          variant="danger"
+          size="lg"
+          onPress={handleLogout}
+          style={{ marginTop: spacing.md, marginBottom: spacing.md }}
+        >
+          Çıkış Yap
+        </Button>
       </ScrollView>
 
       <Modal visible={isEditOpen} animationType="slide" onRequestClose={() => setIsEditOpen(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <ScrollView
-            style={{ flex: 1, paddingHorizontal: spacing.xl }}
-            contentContainerStyle={{ paddingBottom: spacing.xl, paddingTop: spacing.lg }}
+            style={{ flex: 1, paddingHorizontal: spacing.lg }}
+            contentContainerStyle={{ paddingBottom: spacing.lg, paddingTop: spacing.lg }}
             keyboardShouldPersistTaps="handled"
           >
             <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-              Profili Duzenle
+              Profili Düzenle
             </Text>
             <Input
               label={t("onboarding.name")}
@@ -465,7 +520,7 @@ export default function ProfileScreen() {
                   >
                     <Text>{mode.icon}</Text>
                     <Text variant="bodySmall" style={{ marginTop: spacing.xs }}>
-                      {mode.label}
+                      {TRANSPORT_LABELS_TR[mode.value]}
                     </Text>
                   </Pressable>
                 );
@@ -494,7 +549,9 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
       <Text variant="caption" color={colors.textTertiary}>
         {label}
       </Text>
-      <Text variant="body">{value || "-"}</Text>
+      <Text variant="body" style={{ flexWrap: "wrap" }}>
+        {value || "-"}
+      </Text>
     </View>
   );
 }
