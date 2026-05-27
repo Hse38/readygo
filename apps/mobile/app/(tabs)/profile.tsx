@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import * as Updates from "expo-updates";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -262,7 +261,7 @@ export default function ProfileScreen() {
   async function handleLanguageChange(nextLocale: "tr" | "en") {
     if (nextLocale === locale) return;
     await setLanguage(nextLocale);
-    await Updates.reloadAsync();
+    router.replace("/");
   }
 
   function toggleWorkDay(value: string) {
