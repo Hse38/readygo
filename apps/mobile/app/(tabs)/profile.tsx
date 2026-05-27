@@ -1,19 +1,14 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { Text } from "../../components/ui/Text";
 import type { User } from "../../constants/types";
+import { useTheme } from "../../hooks/useTheme";
 import { clearAll, getUser } from "../../lib/storage";
-
-const PRIMARY = "#AFA9EC";
 
 function isUser(value: object | null): value is User {
   return !!value && typeof value === "object" && "name" in value;
@@ -21,6 +16,7 @@ function isUser(value: object | null): value is User {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { colors, spacing } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -45,52 +41,52 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color={PRIMARY} />
+      <SafeAreaView style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pb-8 pt-6">
-        <Text className="mb-8 text-3xl font-bold text-gray-900">Profil</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView style={{ flex: 1, paddingHorizontal: spacing.xl }} contentContainerStyle={{ paddingBottom: spacing.xxl, paddingTop: spacing.lg }}>
+        <Text variant="h1" style={{ marginBottom: spacing.xl }}>
+          Profil
+        </Text>
 
-        <View className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-5">
+        <Card style={{ marginBottom: spacing.md }}>
           <InfoRow label="Ad" value={user?.name ?? "-"} />
           <InfoRow label="Soyad" value={user?.surname ?? "-"} />
           <InfoRow label="Meslek" value={user?.occupation ?? "-"} />
           <InfoRow label="İş Konumu" value={user?.workLocation ?? "-"} />
-        </View>
+        </Card>
 
-        <Pressable
-          onPress={handleEditProfile}
-          className="mb-3 items-center rounded-full py-4"
-          style={{ backgroundColor: PRIMARY }}
-        >
-          <Text className="text-base font-semibold text-white">
+        <Card style={{ marginBottom: spacing.xl }}>
+          <InfoRow label="Ev Konumu" value={user?.homeLocation ?? "-"} />
+          <InfoRow label="Ulaşım Tercihi" value={user?.transportMode ?? "-"} />
+        </Card>
+
+        <View style={{ gap: spacing.sm }}>
+          <Button onPress={handleEditProfile} variant="primary" size="lg">
             Profili Düzenle
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleLogout}
-          className="items-center rounded-full border border-gray-200 py-4"
-        >
-          <Text className="text-base font-semibold text-gray-700">Çıkış Yap</Text>
-        </Pressable>
+          </Button>
+          <Button onPress={handleLogout} variant="secondary" size="lg">
+            Çıkış Yap
+          </Button>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const { colors, spacing } = useTheme();
   return (
-    <View className="mb-4 last:mb-0">
-      <Text className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">
-        {label}
+    <View style={{ marginBottom: spacing.md }}>
+      <Text variant="caption" color={colors.textTertiary} style={{ marginBottom: 4 }}>
+        {label.toUpperCase()}
       </Text>
-      <Text className="text-base text-gray-900">{value}</Text>
+      <Text variant="body">{value}</Text>
     </View>
   );
 }

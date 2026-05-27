@@ -1,19 +1,22 @@
-import { IconHome, IconUser } from "@tabler/icons-react-native";
+import { IconCalendar, IconHome, IconUser } from "@tabler/icons-react-native";
 import { Tabs } from "expo-router";
 
-const PRIMARY = "#AFA9EC";
+import { useTheme } from "../../hooks/useTheme";
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarActiveTintColor: PRIMARY,
-        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopWidth: 0,
+          backgroundColor: colors.surface,
+          borderTopWidth: 0.5,
+          borderTopColor: colors.border,
           elevation: 0,
           shadowOpacity: 0,
           shadowOffset: { width: 0, height: 0 },
@@ -26,6 +29,15 @@ export default function TabsLayout() {
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
             <IconHome size={24} color={color} strokeWidth={focused ? 2 : 1.5} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: "Calendar",
+          tabBarIcon: ({ color, focused }) => (
+            <IconCalendar size={24} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
         }}
       />

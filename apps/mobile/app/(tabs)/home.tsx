@@ -1,7 +1,10 @@
 import {
   IconActivity,
   IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
   IconHeart,
+  IconMapPin,
   IconPencil,
   IconPlane,
   IconPlus,
@@ -12,19 +15,21 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
-  Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Badge } from "../../components/ui/Badge";
+import { Card } from "../../components/ui/Card";
+import { Text } from "../../components/ui/Text";
 import type { ChecklistItem, Event, User } from "../../constants/types";
+import { useTheme } from "../../hooks/useTheme";
 import { apiFetch } from "../../lib/api";
 import { getToken, getUser } from "../../lib/storage";
-
-const PRIMARY = "#AFA9EC";
 
 const TURKISH_DAYS = [
   "Pazar",
@@ -35,7 +40,7 @@ const TURKISH_DAYS = [
   "Cuma",
   "Cumartesi",
 ];
-
+const SHORT_WEEK_DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 const TURKISH_MONTHS = [
   "Ocak",
   "Şubat",
@@ -51,25 +56,20 @@ const TURKISH_MONTHS = [
   "Aralık",
 ];
 
-type EventsResponse = {
-  events: Event[];
-};
-
-type EventTypeStyle = {
-  backgroundColor: string;
-  Icon: typeof IconCalendar;
-};
+type EventsResponse = { events: Event[] };
+type EventTypeStyle = { backgroundColor: string; dotColor: string; Icon: typeof IconCalendar };
 
 const EVENT_TYPE_STYLES: Record<string, EventTypeStyle> = {
-  flight: { backgroundColor: "#EEEDFE", Icon: IconPlane },
-  exam: { backgroundColor: "#E1F5EE", Icon: IconPencil },
-  wedding: { backgroundColor: "#FAECE7", Icon: IconHeart },
-  doctor: { backgroundColor: "#E1F5EE", Icon: IconActivity },
-  meeting: { backgroundColor: "#EEF2FF", Icon: IconUsers },
+  flight: { backgroundColor: "#EEEDFE", dotColor: "#7C6FF7", Icon: IconPlane },
+  exam: { backgroundColor: "#E1F5EE", dotColor: "#10B981", Icon: IconPencil },
+  wedding: { backgroundColor: "#FAECE7", dotColor: "#F97316", Icon: IconHeart },
+  doctor: { backgroundColor: "#E1F5EE", dotColor: "#14B8A6", Icon: IconActivity },
+  meeting: { backgroundColor: "#EEF2FF", dotColor: "#6366F1", Icon: IconUsers },
 };
 
 const DEFAULT_EVENT_STYLE: EventTypeStyle = {
   backgroundColor: "#F1EFE8",
+  dotColor: "#9CA3AF",
   Icon: IconCalendar,
 };
 
@@ -83,20 +83,33 @@ function startOfDay(date: Date): Date {
   return copy;
 }
 
-function formatTurkishDate(date: Date): string {
-  return `${TURKISH_DAYS[date.getDay()]}, ${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]}`;
+function getMonday(date: Date): Date {
+  const copy = startOfDay(date);
+  const day = copy.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + diff);
+  return copy;
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatSelectedDay(date: Date): string {
+  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]}, ${TURKISH_DAYS[date.getDay()]}`;
 }
 
 function formatEventMeta(dateStr: string, location?: string): string {
   const date = new Date(dateStr);
-  const day = date.getDate();
-  const month = TURKISH_MONTHS[date.getMonth()];
   const time = date.toLocaleTimeString("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const datePart = `${day} ${month}, ${time}`;
-  return location ? `${datePart} · ${location}` : datePart;
+  return location ? `${time} · ${location}` : time;
 }
 
 function getDaysRemainingLabel(dateStr: string): string {
@@ -104,7 +117,6 @@ function getDaysRemainingLabel(dateStr: string): string {
   const eventDate = startOfDay(new Date(dateStr));
   const diffMs = eventDate.getTime() - today.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
   if (diffDays === 0) return "Bugün";
   if (diffDays < 0) return "Geçti";
   return `${diffDays} gün`;
@@ -126,48 +138,49 @@ function getNearestEventWithChecklist(events: Event[]): Event | null {
   const today = startOfDay(new Date());
   const upcoming = [...events]
     .filter((event) => startOfDay(new Date(event.date)) >= today)
-    .sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   for (const event of upcoming) {
-    if (event.checklistItems?.some((item) => !item.isCompleted)) {
-      return event;
-    }
+    if (event.checklistItems?.some((item) => !item.isCompleted)) return event;
   }
-
   return null;
 }
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors, spacing, radii, shadows } = useTheme();
   const [events, setEvents] = useState<Event[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [weekStart, setWeekStart] = useState(getMonday(new Date()));
 
-  const todayLabel = useMemo(() => formatTurkishDate(new Date()), []);
-  const nearestEvent = useMemo(
-    () => getNearestEventWithChecklist(events),
-    [events]
-  );
+  const nearestEvent = useMemo(() => getNearestEventWithChecklist(events), [events]);
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }).map((_, index) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + index);
+      return d;
+    });
+  }, [weekStart]);
+
+  const selectedDayEvents = useMemo(() => {
+    return [...events]
+      .filter((event) => sameDay(new Date(event.date), selectedDate))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [events, selectedDate]);
 
   const fetchEvents = useCallback(async (refreshing = false) => {
     try {
-      if (refreshing) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
+      if (refreshing) setIsRefreshing(true);
+      else setIsLoading(true);
       setError(null);
-
       const token = await getToken();
       if (!token) {
         setEvents([]);
         return;
       }
-
       const response = await apiFetch<EventsResponse>("/events", {}, token);
       setEvents(response.events ?? []);
     } catch (err) {
@@ -184,17 +197,12 @@ export default function HomeScreen() {
       setUser(isUser(storedUser) ? storedUser : null);
       await fetchEvents();
     }
-
     loadInitialData();
   }, [fetchEvents]);
 
-  async function handleToggleChecklistItem(
-    itemId: string,
-    eventId: string
-  ) {
+  async function handleToggleChecklistItem(itemId: string, eventId: string) {
     const token = await getToken();
     if (!token) return;
-
     setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
@@ -206,14 +214,10 @@ export default function HomeScreen() {
         };
       })
     );
-
     try {
       await apiFetch(
         `/checklist/${itemId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ isCompleted: true }),
-        },
+        { method: "PUT", body: JSON.stringify({ isCompleted: true }) },
         token
       );
     } catch {
@@ -233,17 +237,24 @@ export default function HomeScreen() {
 
   function renderChecklistPreview(event: Event) {
     const incompleteItems =
-      event.checklistItems?.filter((item) => !item.isCompleted).slice(0, 3) ??
-      [];
-
+      event.checklistItems?.filter((item) => !item.isCompleted).slice(0, 3) ?? [];
     if (incompleteItems.length === 0) return null;
-
     return (
-      <View className="mt-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
-        <View className="mb-2 flex-row items-center">
-          <IconSparkles size={14} color={PRIMARY} strokeWidth={2} />
-          <Text className="ml-1.5 text-xs font-semibold" style={{ color: PRIMARY }}>
-            AI checklist
+      <View
+        style={{
+          marginTop: spacing.sm,
+          borderRadius: radii.lg,
+          borderWidth: 1,
+          borderColor: colors.borderLight,
+          backgroundColor: colors.backgroundSecondary,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+        }}
+      >
+        <View style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center" }}>
+          <IconSparkles size={14} color={colors.primary} strokeWidth={2} />
+          <Text variant="label" color={colors.primary} style={{ marginLeft: 6 }}>
+            Yapılacaklar
           </Text>
         </View>
         {incompleteItems.map((item) => (
@@ -257,91 +268,193 @@ export default function HomeScreen() {
     );
   }
 
+  function moveWeek(direction: "prev" | "next") {
+    const next = new Date(weekStart);
+    next.setDate(weekStart.getDate() + (direction === "next" ? 7 : -7));
+    setWeekStart(next);
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between px-6 pb-4 pt-2">
-        <Text className="text-3xl font-light tracking-tight text-gray-900">
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.lg,
+        }}
+      >
+        <Text style={{ fontSize: 26, fontFamily: "Inter_700Bold", color: colors.textSecondary }}>
           r
-          <Text className="font-bold" style={{ color: PRIMARY }}>
+          <Text style={{ color: colors.primary, fontSize: 26, fontFamily: "Inter_700Bold" }}>
             GO
           </Text>
         </Text>
         <View
-          className="h-10 w-10 items-center justify-center rounded-full"
-          style={{ backgroundColor: PRIMARY }}
+          style={{
+            height: 40,
+            width: 40,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: radii.full,
+            backgroundColor: colors.primary,
+          }}
         >
-          <Text className="text-sm font-bold text-white">
+          <Text variant="label" color={colors.white}>
             {getInitials(user)}
           </Text>
         </View>
       </View>
 
       <ScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="pb-28"
+        style={{ flex: 1, paddingHorizontal: spacing.xl }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => fetchEvents(true)}
-            tintColor={PRIMARY}
-            colors={[PRIMARY]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        <Text className="mb-1 text-sm text-gray-400">Bugün</Text>
-        <Text className="mb-6 text-xl font-semibold text-gray-900">
-          {todayLabel}
+        <View
+          style={{
+            marginBottom: spacing.lg,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Pressable onPress={() => moveWeek("prev")} hitSlop={10}>
+            <IconChevronLeft color={colors.textSecondary} size={20} />
+          </Pressable>
+          <Text variant="label" color={colors.textSecondary}>
+            Hafta Görünümü
+          </Text>
+          <Pressable onPress={() => moveWeek("next")} hitSlop={10}>
+            <IconChevronRight color={colors.textSecondary} size={20} />
+          </Pressable>
+        </View>
+
+        <FlatList
+          data={weekDays}
+          horizontal
+          keyExtractor={(item) => item.toISOString()}
+          contentContainerStyle={{ gap: spacing.sm, marginBottom: spacing.xl }}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item, index }) => {
+            const dayEvents = events.filter((event) => sameDay(new Date(event.date), item));
+            const isToday = sameDay(item, new Date());
+            const isSelected = sameDay(item, selectedDate);
+            const bgColor = isToday
+              ? colors.primary
+              : isSelected
+                ? colors.primaryLight
+                : colors.backgroundSecondary;
+            const txtColor = isToday || isSelected ? colors.white : colors.text;
+            return (
+              <Pressable
+                onPress={() => setSelectedDate(item)}
+                style={{
+                  width: 56,
+                  borderRadius: radii.full,
+                  backgroundColor: bgColor,
+                  paddingVertical: spacing.sm,
+                  alignItems: "center",
+                }}
+              >
+                <Text variant="caption" color={txtColor}>
+                  {SHORT_WEEK_DAYS[index]}
+                </Text>
+                <Text variant="label" color={txtColor} style={{ marginTop: 2 }}>
+                  {item.getDate()}
+                </Text>
+                <View style={{ marginTop: 4, minHeight: 6, flexDirection: "row", gap: 2 }}>
+                  {dayEvents.slice(0, 4).map((event, dotIndex) => (
+                    <View
+                      key={`${event.id}-${dotIndex}`}
+                      style={{
+                        height: 5,
+                        width: 5,
+                        borderRadius: radii.full,
+                        backgroundColor: getEventTypeStyle(event.type).dotColor,
+                      }}
+                    />
+                  ))}
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+
+        <Text variant="h3" style={{ marginBottom: spacing.lg }}>
+          {formatSelectedDay(selectedDate)}
         </Text>
 
         {isLoading ? (
-          <View className="items-center py-16">
-            <ActivityIndicator size="large" color={PRIMARY} />
+          <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : error ? (
-          <View className="items-center py-16">
-            <Text className="text-center text-base text-gray-500">{error}</Text>
+          <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
+            <Text variant="body" color={colors.textSecondary} style={{ textAlign: "center" }}>
+              {error}
+            </Text>
           </View>
-        ) : events.length === 0 ? (
-          <View className="items-center py-16">
-            <Text className="text-center text-base leading-6 text-gray-400">
-              Henüz etkinlik yok{"\n"}İlk etkinliğini eklemek için + butonuna bas
+        ) : selectedDayEvents.length === 0 ? (
+          <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
+            <Text style={{ fontSize: 42 }}>🗓️</Text>
+            <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md }}>
+              Bu gün etkinlik yok
             </Text>
           </View>
         ) : (
-          events.map((event) => {
+          selectedDayEvents.map((event) => {
             const { backgroundColor, Icon } = getEventTypeStyle(event.type);
             const showChecklist = nearestEvent?.id === event.id;
-
             return (
-              <View key={event.id} className="mb-4">
-                <Pressable
+              <View key={event.id} style={{ marginBottom: spacing.md }}>
+                <Card
                   onPress={() => router.push(`/event/${event.id}`)}
-                  className="flex-row items-center rounded-2xl border border-gray-100 bg-white p-4"
+                  style={[
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      padding: spacing.lg,
+                    },
+                    shadows.sm,
+                  ]}
                 >
                   <View
-                    className="mr-3 h-12 w-12 items-center justify-center rounded-full"
-                    style={{ backgroundColor }}
+                    style={{
+                      marginRight: spacing.md,
+                      height: 44,
+                      width: 44,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: radii.full,
+                      backgroundColor,
+                    }}
                   >
                     <Icon size={22} color="#4B5563" strokeWidth={1.75} />
                   </View>
-
-                  <View className="flex-1 pr-3">
-                    <Text className="text-base font-bold text-gray-900">
+                  <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                    <Text variant="h3" style={{ fontSize: 17 }}>
                       {event.title}
                     </Text>
-                    <Text className="mt-1 text-sm text-gray-400">
-                      {formatEventMeta(event.date, event.location)}
-                    </Text>
+                    <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center" }}>
+                      <IconMapPin size={13} color={colors.textTertiary} />
+                      <Text variant="bodySmall" color={colors.textSecondary} style={{ marginLeft: 4 }}>
+                        {formatEventMeta(event.date, event.location)}
+                      </Text>
+                    </View>
                   </View>
-
-                  <View className="rounded-full bg-gray-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-gray-600">
-                      {getDaysRemainingLabel(event.date)}
-                    </Text>
-                  </View>
-                </Pressable>
-
+                  <Badge variant="primary" size="sm" label={getDaysRemainingLabel(event.date)} />
+                </Card>
                 {showChecklist ? renderChecklistPreview(event) : null}
               </View>
             );
@@ -351,10 +464,20 @@ export default function HomeScreen() {
 
       <Pressable
         onPress={() => router.push("/new-event")}
-        className="absolute bottom-6 left-6 h-[52px] w-[52px] items-center justify-center rounded-full"
-        style={{ backgroundColor: PRIMARY }}
+        style={{
+          position: "absolute",
+          right: spacing.xl,
+          bottom: spacing.xxl,
+          height: 56,
+          width: 56,
+          borderRadius: radii.full,
+          backgroundColor: colors.primary,
+          alignItems: "center",
+          justifyContent: "center",
+          ...shadows.lg,
+        }}
       >
-        <IconPlus size={28} color="#FFFFFF" strokeWidth={2} />
+        <IconPlus size={28} color={colors.white} strokeWidth={2} />
       </Pressable>
     </SafeAreaView>
   );
@@ -367,13 +490,25 @@ function ChecklistPreviewItem({
   item: ChecklistItem;
   onToggle: () => void;
 }) {
+  const { colors, radii, spacing } = useTheme();
   return (
     <Pressable
       onPress={onToggle}
-      className="mb-2 flex-row items-center last:mb-0"
+      style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center" }}
     >
-      <View className="mr-3 h-5 w-5 rounded-full border-2 border-gray-300" />
-      <Text className="flex-1 text-sm text-gray-700">{item.title}</Text>
+      <View
+        style={{
+          marginRight: spacing.sm,
+          height: 18,
+          width: 18,
+          borderRadius: radii.full,
+          borderWidth: 1.5,
+          borderColor: colors.border,
+        }}
+      />
+      <Text variant="bodySmall" color={colors.textSecondary} style={{ flex: 1 }}>
+        {item.title}
+      </Text>
     </Pressable>
   );
 }
