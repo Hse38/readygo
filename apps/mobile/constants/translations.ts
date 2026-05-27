@@ -123,6 +123,7 @@ export const translations = {
     profile: {
       events: "Etkinlik",
       completed: "Tamamlanan",
+      upcoming: "Yaklasan",
       professionMissing: "Meslek belirtilmedi",
       occupation: "Meslek",
       workLocation: "Is Konumu",
@@ -264,6 +265,7 @@ export const translations = {
     profile: {
       events: "Events",
       completed: "Completed",
+      upcoming: "Upcoming",
       professionMissing: "Occupation not set",
       occupation: "Occupation",
       workLocation: "Work Location",

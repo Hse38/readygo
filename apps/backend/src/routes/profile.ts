@@ -8,5 +8,6 @@ router.use(authMiddleware);
 
 router.get("/", profileController.getProfile);
 router.post("/", profileController.updateProfile);
+router.put("/", profileController.partialUpdateProfile);
 
 export default router;
