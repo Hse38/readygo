@@ -24,7 +24,8 @@ model User {
   morningAlarm     Boolean?
   createdAt        DateTime @default(now())
 
-  events Event[]
+  events          Event[]
+  participations  Participant[]
 }
 
 model Event {
@@ -39,9 +40,27 @@ model Event {
   travelMode   String?
   createdAt    DateTime @default(now())
 
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   checklistItems ChecklistItem[]
+  participants   Participant[]
 
+  @@index([userId])
+}
+
+model Participant {
+  id          String   @id @default(cuid())
+  eventId     String
+  userId      String?
+  email       String
+  name        String?
+  status      String   @default("pending")
+  inviteToken String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
   @@index([userId])
 }
 

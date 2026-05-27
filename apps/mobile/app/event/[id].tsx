@@ -2,7 +2,9 @@ import {
   IconClock,
   IconMapPin,
   IconSparkles,
+  IconUserPlus,
 } from "@tabler/icons-react-native";
+import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -10,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -20,8 +23,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { Input } from "../../components/ui/Input";
 import { Text } from "../../components/ui/Text";
-import type { ChecklistItem, Event, User } from "../../constants/types";
+import type { ChecklistItem, Event, Participant, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
 import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
@@ -62,6 +66,13 @@ type TravelTimeResponse = {
   distanceText: string;
   departureTime: string;
   transitDetails?: { firstDeparture: string; steps: TravelStep[] };
+};
+type EventParticipantsResponse = {
+  participants: Participant[];
+};
+type AddParticipantResponse = {
+  participant: Participant;
+  inviteLink: string;
 };
 
 function isUser(value: object | null): value is User {
@@ -109,6 +120,12 @@ export default function EventDetailScreen() {
   const [isLoadingTravel, setIsLoadingTravel] = useState(true);
   const [travelInfo, setTravelInfo] = useState<TravelTimeResponse | null>(null);
   const [travelError, setTravelError] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isParticipantsModalVisible, setParticipantsModalVisible] = useState(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [participantEmail, setParticipantEmail] = useState("");
+  const [participantName, setParticipantName] = useState("");
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
 
   const sortedChecklist = useMemo(() => {
     const items = event?.checklistItems ?? [];
@@ -166,6 +183,22 @@ export default function EventDetailScreen() {
   useEffect(() => {
     if (event) void loadTravelTime(event, storedUser);
   }, [event, storedUser, loadTravelTime]);
+
+  const loadParticipants = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const response = await apiFetch<EventParticipantsResponse>(`/events/${eventId}/participants`, {}, token);
+      setParticipants(response.participants);
+    } catch {
+      // ignore participant load errors in detail page
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    void loadParticipants();
+  }, [loadParticipants]);
 
   async function handleToggleChecklistItem(item: ChecklistItem) {
     if (!event) return;
@@ -237,6 +270,58 @@ export default function EventDetailScreen() {
         { text: t("common.cancel"), style: "cancel" },
       ]);
     }
+  }
+
+  async function handleAddParticipant() {
+    if (!eventId || !participantEmail.trim()) {
+      Alert.alert(t("common.error"), "Email gerekli.");
+      return;
+    }
+
+    try {
+      setIsAddingParticipant(true);
+      const token = await getToken();
+      if (!token) return;
+      const response = await apiFetch<AddParticipantResponse>(
+        `/events/${eventId}/participants`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email: participantEmail.trim(),
+            name: participantName.trim() || undefined,
+          }),
+        },
+        token
+      );
+      setGeneratedInviteLink(response.inviteLink);
+      setParticipantEmail("");
+      setParticipantName("");
+      await loadParticipants();
+    } catch (error) {
+      Alert.alert(t("common.error"), error instanceof Error ? error.message : "Davet gonderilemedi.");
+    } finally {
+      setIsAddingParticipant(false);
+    }
+  }
+
+  function getStatusColor(status: Participant["status"]): string {
+    if (status === "accepted") return colors.success;
+    if (status === "declined") return colors.danger;
+    return colors.warning;
+  }
+
+  function getInitials(participant: Participant): string {
+    const text =
+      participant.name ||
+      participant.user?.name ||
+      participant.user?.email ||
+      participant.email;
+    return text
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((chunk) => chunk[0]?.toUpperCase() ?? "")
+      .join("");
   }
 
   const typeMeta = event ? EVENT_TYPES[event.type.toLowerCase()] ?? EVENT_TYPES.other : EVENT_TYPES.other;
@@ -358,9 +443,106 @@ export default function EventDetailScreen() {
                 </Pressable>
               ))}
             </Card>
+
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm }}>
+              <Text variant="h3">Katilimcilar</Text>
+              <IconUserPlus size={18} color={colors.primary} style={{ marginLeft: spacing.xs }} />
+            </View>
+            <Card>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.md }}>
+                {participants.slice(0, 5).map((participant) => (
+                  <View
+                    key={participant.id}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: radii.full,
+                      backgroundColor: colors.backgroundTertiary,
+                      borderWidth: 2,
+                      borderColor: getStatusColor(participant.status),
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: spacing.xs,
+                    }}
+                  >
+                    <Text variant="caption">{getInitials(participant)}</Text>
+                  </View>
+                ))}
+                {participants.length > 5 ? (
+                  <Text variant="bodySmall" color={colors.textSecondary}>
+                    +{participants.length - 5} more
+                  </Text>
+                ) : null}
+              </View>
+
+              <Button variant="secondary" onPress={() => setParticipantsModalVisible(true)}>
+                Kisi Ekle +
+              </Button>
+            </Card>
           </>
         )}
       </ScrollView>
+
+      <Modal visible={isParticipantsModalVisible} transparent animationType="slide" onRequestClose={() => setParticipantsModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
+          <View
+            style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: radii.xl,
+              borderTopRightRadius: radii.xl,
+              padding: spacing.xl,
+            }}
+          >
+            <Text variant="h3" style={{ marginBottom: spacing.md }}>
+              Davet Gonder
+            </Text>
+            <Input
+              label="Email"
+              value={participantEmail}
+              onChangeText={setParticipantEmail}
+              placeholder="ornek@email.com"
+            />
+            <Input
+              label="Isim (opsiyonel)"
+              value={participantName}
+              onChangeText={setParticipantName}
+              placeholder="Ahmet"
+            />
+            <Button onPress={handleAddParticipant} loading={isAddingParticipant}>
+              Davet Gonder
+            </Button>
+            {generatedInviteLink ? (
+              <Card style={{ marginTop: spacing.md }}>
+                <Text variant="caption" color={colors.textSecondary}>
+                  Davet Linki
+                </Text>
+                <Text variant="bodySmall" style={{ marginVertical: spacing.xs }}>
+                  {generatedInviteLink}
+                </Text>
+                <Button
+                  variant="ghost"
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(generatedInviteLink);
+                    Alert.alert("Kopyalandi", "Davet linki panoya kopyalandi.");
+                  }}
+                >
+                  Kopyala
+                </Button>
+              </Card>
+            ) : null}
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setParticipantsModalVisible(false);
+                setGeneratedInviteLink(null);
+              }}
+              style={{ marginTop: spacing.sm }}
+            >
+              {t("common.cancel")}
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

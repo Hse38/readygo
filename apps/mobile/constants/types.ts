@@ -28,6 +28,23 @@ export type Event = {
   checklistItems?: ChecklistItem[];
 };
 
+export type Participant = {
+  id: string;
+  eventId: string;
+  userId?: string | null;
+  email: string;
+  name?: string | null;
+  status: "pending" | "accepted" | "declined";
+  inviteToken: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name?: string | null;
+    surname?: string | null;
+    email: string;
+  } | null;
+};
+
 export type ChecklistItem = {
   id: string;
   eventId: string;

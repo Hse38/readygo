@@ -13,6 +13,7 @@ import { useFonts } from "expo-font";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Linking } from "react-native";
 
 import {
   configureNotificationHandler,
@@ -51,7 +52,24 @@ export default function RootLayout() {
         if (eventId) navigateToEvent(eventId);
       });
 
-    return () => subscription.remove();
+    const handleDeepLink = (url: string) => {
+      const match = url.match(/invite\/([^/?#]+)/);
+      if (match?.[1]) {
+        router.push(`/invite/${match[1]}`);
+      }
+    };
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+    const deepLinkSubscription = Linking.addEventListener("url", ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    return () => {
+      subscription.remove();
+      deepLinkSubscription.remove();
+    };
   }, [router]);
 
   useEffect(() => {
@@ -73,6 +91,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="new-event" />
         <Stack.Screen name="event/[id]" />
+        <Stack.Screen name="invite/[token]" />
       </Stack>
       <StatusBar style="auto" />
     </>
