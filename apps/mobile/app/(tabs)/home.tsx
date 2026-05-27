@@ -12,9 +12,11 @@ import {
   IconUsers,
 } from "@tabler/icons-react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Pressable,
   RefreshControl,
@@ -30,6 +32,7 @@ import type { ChecklistItem, Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
 import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
+import { getEventAccentColor } from "../../lib/eventTypeColors";
 import { getTintedSurface } from "../../lib/themeSurfaces";
 import { clearAll, getToken, getUser } from "../../lib/storage";
 
@@ -126,6 +129,7 @@ function getEventTypeStyle(
   const base = EVENT_TYPE_STYLES[type.toLowerCase()] ?? DEFAULT_EVENT_STYLE;
   return {
     ...base,
+    dotColor: getEventAccentColor(base.dotColor, isDark),
     backgroundColor: getTintedSurface(base.backgroundColor, isDark, colors),
   };
 }
@@ -299,8 +303,9 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <LinearGradient
+        colors={isDark ? ["#1A1928", "#0F0E1A"] : ["#F8F7FF", "#FFFFFF"]}
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -310,12 +315,14 @@ export default function HomeScreen() {
           paddingBottom: spacing.lg,
         }}
       >
-        <Text style={{ fontSize: 26, fontFamily: "Inter_700Bold", color: colors.textSecondary }}>
-          r
-          <Text style={{ color: colors.primary, fontSize: 26, fontFamily: "Inter_700Bold" }}>
-            GO
+        <View style={{ ...shadows.md, shadowColor: colors.primary }}>
+          <Text style={{ fontSize: 26, fontFamily: "Inter_700Bold", color: colors.textSecondary }}>
+            r
+            <Text style={{ color: colors.primary, fontSize: 26, fontFamily: "Inter_700Bold" }}>
+              GO
+            </Text>
           </Text>
-        </Text>
+        </View>
         <View
           style={{
             height: 40,
@@ -330,11 +337,11 @@ export default function HomeScreen() {
             {getInitials(user)}
           </Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={{ flex: 1, paddingHorizontal: spacing.lg }}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -370,50 +377,15 @@ export default function HomeScreen() {
           keyExtractor={(item) => item.toISOString()}
           contentContainerStyle={{ gap: spacing.sm, marginBottom: spacing.xl }}
           showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => {
-            const dayEvents = events.filter((event) => sameDay(new Date(event.date), item));
-            const isToday = sameDay(item, new Date());
-            const isSelected = sameDay(item, selectedDate);
-            const bgColor = isToday
-              ? colors.primary
-              : isSelected
-                ? colors.primary
-                : colors.backgroundSecondary;
-            const txtColor = isToday || isSelected ? colors.white : colors.text;
-            const dayIndex = item.getDay() === 0 ? 6 : item.getDay() - 1;
-            return (
-              <Pressable
-                onPress={() => setSelectedDate(item)}
-                style={{
-                  width: 56,
-                  borderRadius: radii.full,
-                  backgroundColor: bgColor,
-                  paddingVertical: spacing.sm,
-                  alignItems: "center",
-                }}
-              >
-                <Text variant="caption" color={txtColor}>
-                  {WEEKDAY_SHORT_TR[dayIndex]}
-                </Text>
-                <Text variant="label" color={txtColor} style={{ marginTop: 2 }}>
-                  {item.getDate()}
-                </Text>
-                <View style={{ marginTop: 4, minHeight: 6, flexDirection: "row", gap: 2 }}>
-                  {dayEvents.slice(0, 4).map((event, dotIndex) => (
-                    <View
-                      key={`${event.id}-${dotIndex}`}
-                      style={{
-                        height: 5,
-                        width: 5,
-                        borderRadius: radii.full,
-                        backgroundColor: getEventTypeStyle(event.type, isDark, colors).dotColor,
-                      }}
-                    />
-                  ))}
-                </View>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => (
+            <WeekDayPill
+              date={item}
+              events={events}
+              isSelected={sameDay(item, selectedDate)}
+              isToday={sameDay(item, new Date())}
+              onPress={() => setSelectedDate(item)}
+            />
+          )}
         />
 
         <Text variant="h3" style={{ marginBottom: spacing.lg }}>
@@ -432,40 +404,14 @@ export default function HomeScreen() {
           </View>
         ) : selectedDayEvents.length === 0 ? (
           <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
-            <View
-              style={{
-                width: 108,
-                height: 108,
-                borderRadius: 24,
-                backgroundColor: colors.backgroundTertiary,
-                borderWidth: 2,
-                borderColor: colors.border,
-                padding: 14,
-              }}
-            >
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
-              </View>
-              <View
-                style={{
-                  flex: 1,
-                  borderRadius: 12,
-                  backgroundColor: colors.surface,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ color: colors.primary, fontSize: 28, fontFamily: "Inter_700Bold" }}>+</Text>
-              </View>
-            </View>
+            <FloatingEmptyIllustration />
             <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md }}>
               {t("home.noEvent")}
             </Text>
           </View>
         ) : (
           selectedDayEvents.map((event) => {
-            const { backgroundColor, Icon } = getEventTypeStyle(event.type, isDark, colors);
+            const { backgroundColor, dotColor, Icon } = getEventTypeStyle(event.type, isDark, colors);
             const showChecklist = nearestEvent?.id === event.id;
             return (
               <View key={event.id} style={{ marginBottom: spacing.md }}>
@@ -476,6 +422,8 @@ export default function HomeScreen() {
                       flexDirection: "row",
                       alignItems: "center",
                       padding: spacing.lg,
+                      borderLeftWidth: 4,
+                      borderLeftColor: dotColor,
                     },
                     shadows.sm,
                   ]}
@@ -513,24 +461,165 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <Pressable
-        onPress={() => router.push("/new-event")}
+      <PulsingFab onPress={() => router.push("/new-event")} />
+    </SafeAreaView>
+  );
+}
+
+function WeekDayPill({
+  date,
+  events,
+  isSelected,
+  isToday,
+  onPress,
+}: {
+  date: Date;
+  events: Event[];
+  isSelected: boolean;
+  isToday: boolean;
+  onPress: () => void;
+}) {
+  const { colors, spacing, radii, isDark } = useTheme();
+  const scale = useRef(new Animated.Value(1)).current;
+  const dayEvents = events.filter((event) => sameDay(new Date(event.date), date));
+  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+  const active = isToday || isSelected;
+
+  useEffect(() => {
+    if (isSelected) {
+      Animated.spring(scale, { toValue: 1.06, friction: 4, tension: 120, useNativeDriver: true }).start();
+    } else {
+      Animated.spring(scale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+    }
+  }, [isSelected, scale]);
+
+  const bgColor = active ? colors.primary : colors.backgroundSecondary;
+  const txtColor = active ? colors.white : colors.text;
+
+  return (
+    <Pressable onPress={onPress}>
+      <Animated.View
         style={{
-          position: "absolute",
-          right: spacing.lg,
-          bottom: spacing.xxl,
+          width: 56,
+          borderRadius: radii.full,
+          backgroundColor: bgColor,
+          paddingVertical: spacing.sm,
+          alignItems: "center",
+          transform: [{ scale }],
+        }}
+      >
+        <Text variant="caption" color={txtColor}>
+          {WEEKDAY_SHORT_TR[dayIndex]}
+        </Text>
+        <Text variant="label" color={txtColor} style={{ marginTop: 2 }}>
+          {date.getDate()}
+        </Text>
+        <View style={{ marginTop: 4, minHeight: 6, flexDirection: "row", gap: 2 }}>
+          {dayEvents.slice(0, 4).map((event, dotIndex) => (
+            <View
+              key={`${event.id}-${dotIndex}`}
+              style={{
+                height: 5,
+                width: 5,
+                borderRadius: radii.full,
+                backgroundColor: getEventTypeStyle(event.type, isDark, colors).dotColor,
+              }}
+            />
+          ))}
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function FloatingEmptyIllustration() {
+  const { colors, radii } = useTheme();
+  const floatY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatY, { toValue: -8, duration: 1400, useNativeDriver: true }),
+        Animated.timing(floatY, { toValue: 0, duration: 1400, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [floatY]);
+
+  return (
+    <Animated.View style={{ transform: [{ translateY: floatY }] }}>
+      <View
+        style={{
+          width: 108,
+          height: 108,
+          borderRadius: 24,
+          backgroundColor: colors.backgroundTertiary,
+          borderWidth: 2,
+          borderColor: colors.border,
+          padding: 14,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
+        </View>
+        <View
+          style={{
+            flex: 1,
+            borderRadius: 12,
+            backgroundColor: colors.surface,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: colors.primary, fontSize: 28, fontFamily: "Inter_700Bold" }}>+</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+function PulsingFab({ onPress }: { onPress: () => void }) {
+  const { colors, spacing, radii, shadows } = useTheme();
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.06, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        right: spacing.lg,
+        bottom: spacing.xxl,
+        transform: [{ scale: pulse }],
+        ...shadows.lg,
+        shadowColor: colors.primary,
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        style={{
           height: 56,
           width: 56,
           borderRadius: radii.full,
           backgroundColor: colors.primary,
           alignItems: "center",
           justifyContent: "center",
-          ...shadows.lg,
         }}
       >
         <IconPlus size={28} color={colors.white} strokeWidth={2} />
       </Pressable>
-    </SafeAreaView>
+    </Animated.View>
   );
 }
 

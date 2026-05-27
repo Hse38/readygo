@@ -1,11 +1,7 @@
 import type { ReactNode } from "react";
-import {
-  Pressable,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { Animated, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { usePressScale } from "../../hooks/usePressScale";
 import { useTheme } from "../../hooks/useTheme";
 
 type Props = {
@@ -15,24 +11,37 @@ type Props = {
 };
 
 export function Card({ children, style, onPress }: Props) {
-  const { colors, radii, shadows } = useTheme();
+  const { colors, radii, shadows, isDark } = useTheme();
+  const { scale, onPressIn, onPressOut } = usePressScale(0.98);
+
   const baseStyle: ViewStyle = {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
-    ...shadows.md,
+    ...(isDark ? shadows.sm : shadows.md),
   };
 
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [baseStyle, { opacity: pressed ? 0.9 : 1 }, style]}
-      >
-        {children}
-      </Pressable>
+      <Animated.View style={[{ transform: [{ scale }] }, style]}>
+        <Pressable
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          style={({ pressed }) => [
+            baseStyle,
+            pressed && {
+              shadowOpacity: 0.2,
+              shadowRadius: 12,
+              elevation: 6,
+            },
+          ]}
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
     );
   }
 

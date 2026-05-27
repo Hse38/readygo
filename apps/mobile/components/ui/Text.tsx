@@ -29,12 +29,12 @@ export function Text({ variant = "body", color, style, children }: Props) {
       lineHeight: typography.sizes.xxxl * typography.lineHeights.tight,
     },
     h2: {
-      fontFamily: typography.fonts.semiBold,
+      fontFamily: typography.fonts.bold,
       fontSize: typography.sizes.xxl,
       lineHeight: typography.sizes.xxl * typography.lineHeights.tight,
     },
     h3: {
-      fontFamily: typography.fonts.semiBold,
+      fontFamily: typography.fonts.bold,
       fontSize: typography.sizes.xl,
       lineHeight: typography.sizes.xl * typography.lineHeights.normal,
     },
@@ -57,6 +57,8 @@ export function Text({ variant = "body", color, style, children }: Props) {
       fontFamily: typography.fonts.medium,
       fontSize: typography.sizes.sm,
       lineHeight: typography.sizes.sm * typography.lineHeights.normal,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
     },
   };
 

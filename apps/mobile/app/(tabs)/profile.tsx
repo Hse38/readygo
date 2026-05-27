@@ -1,11 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   Modal,
   Platform,
@@ -103,9 +105,10 @@ function toEditableProfile(user: User | null): EditableProfile {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { colors, spacing, radii } = useTheme();
+  const { colors, spacing, radii, shadows, isDark } = useTheme();
   const { locale, setLanguage, t } = useTranslation();
-  const { isDark, setDarkMode } = useDarkMode();
+  const { isDark: isDarkMode, setDarkMode } = useDarkMode();
+  const avatarPulse = useRef(new Animated.Value(1)).current;
 
   const [user, setUser] = useState<User | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -156,6 +159,17 @@ export default function ProfileScreen() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(avatarPulse, { toValue: 1.08, duration: 1200, useNativeDriver: true }),
+        Animated.timing(avatarPulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [avatarPulse]);
 
   async function saveProfilePhoto(base64Uri: string | null) {
     if (!base64Uri) {
@@ -291,66 +305,79 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
-        style={{ flex: 1, paddingHorizontal: spacing.lg }}
-        contentContainerStyle={{ paddingBottom: spacing.xxl, paddingTop: spacing.lg }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: spacing.xxl }}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
-          <Pressable
-            onPress={handleAvatarPress}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: radii.full,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-            }}
-          >
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={{ width: "100%", height: "100%" }} />
-            ) : (
-              <Text variant="h2" color={colors.white}>
-                {initials}
-              </Text>
-            )}
-          </Pressable>
-          <Text variant="h3" style={{ marginTop: spacing.sm, textAlign: "center" }}>
-            {`${user?.name ?? ""} ${user?.surname ?? ""}`.trim() || t("profile.user")}
-          </Text>
-          <Text variant="bodySmall" color={colors.textSecondary} style={{ textAlign: "center" }}>
-            {user?.occupation || t("profile.professionMissing")}
-          </Text>
-        </View>
+        <LinearGradient
+          colors={isDark ? ["#1A1928", "#0F0E1A"] : ["#F8F7FF", colors.background]}
+          style={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: spacing.xl,
+            marginBottom: spacing.md,
+          }}
+        >
+          <View style={{ alignItems: "center" }}>
+            <Animated.View
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: radii.full,
+                alignItems: "center",
+                justifyContent: "center",
+                transform: [{ scale: avatarPulse }],
+                ...shadows.lg,
+                shadowColor: colors.primary,
+              }}
+            >
+              <Pressable
+                onPress={handleAvatarPress}
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: radii.full,
+                  backgroundColor: colors.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  borderWidth: 3,
+                  borderColor: colors.primaryLight,
+                }}
+              >
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={{ width: "100%", height: "100%" }} />
+                ) : (
+                  <Text variant="h2" color={colors.white}>
+                    {initials}
+                  </Text>
+                )}
+              </Pressable>
+            </Animated.View>
+            <Text variant="h2" style={{ marginTop: spacing.md, textAlign: "center" }}>
+              {`${user?.name ?? ""} ${user?.surname ?? ""}`.trim() || t("profile.user")}
+            </Text>
+            <Text variant="bodySmall" color={colors.textSecondary} style={{ textAlign: "center" }}>
+              {user?.occupation || t("profile.professionMissing")}
+            </Text>
+          </View>
+        </LinearGradient>
 
+        <View style={{ paddingHorizontal: spacing.lg }}>
         <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
-          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
-            <Text variant="h2" color={colors.text}>
-              {String(eventCount)}
-            </Text>
-            <Text variant="caption" color={colors.textSecondary}>
-              {t("profile.events")}
-            </Text>
-          </Card>
-          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
-            <Text variant="h2" color={colors.text}>
-              {String(completedTasks)}
-            </Text>
-            <Text variant="caption" color={colors.textSecondary}>
-              {t("profile.completed")}
-            </Text>
-          </Card>
-          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
-            <Text variant="h2" color={colors.text}>
-              {String(upcomingEvents)}
-            </Text>
-            <Text variant="caption" color={colors.textSecondary}>
-              {t("profile.upcoming")}
-            </Text>
-          </Card>
+          <StatCard value={String(eventCount)} label={t("profile.events")} />
+          <StatCard value={String(completedTasks)} label={t("profile.completed")} />
+          <StatCard value={String(upcomingEvents)} label={t("profile.upcoming")} />
         </View>
 
-        <Card style={{ marginBottom: spacing.md, backgroundColor: colors.surface }}>
+        <Card
+          style={{
+            marginBottom: spacing.md,
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderWidth: 1,
+          }}
+        >
           <InfoRow label={t("profile.occupation")} value={user?.occupation} />
           <InfoRow label={t("profile.workLocation")} value={user?.workLocation} />
           <InfoRow label={t("profile.homeLocation")} value={user?.homeLocation} />
@@ -364,7 +391,14 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        <Card style={{ marginBottom: spacing.md, backgroundColor: colors.surface }}>
+        <Card
+          style={{
+            marginBottom: spacing.md,
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderWidth: 1,
+          }}
+        >
           <SettingRow label="Dil / Language">
             <View style={{ flexDirection: "row", gap: spacing.xs }}>
               <Pressable
@@ -400,10 +434,10 @@ export default function ProfileScreen() {
 
           <SettingRow label={t("profile.darkMode")}>
             <Switch
-              value={isDark}
+              value={isDarkMode}
               onValueChange={(value) => void setDarkMode(value)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={isDark ? colors.primary : colors.surface}
+              thumbColor={isDarkMode ? colors.primary : colors.surface}
             />
           </SettingRow>
           <SettingRow label={t("profile.notifications")}>
@@ -419,20 +453,17 @@ export default function ProfileScreen() {
         <Button
           variant="secondary"
           size="lg"
+          fullWidth
           onPress={() => setIsEditOpen(true)}
-          style={{ marginBottom: spacing.md, borderRadius: radii.xl }}
+          style={{ marginBottom: spacing.md }}
         >
           Profili Düzenle
         </Button>
 
-        <Button
-          variant="danger"
-          size="lg"
-          onPress={handleLogout}
-          style={{ marginTop: spacing.sm, marginBottom: spacing.md, borderRadius: radii.xl }}
-        >
+        <Button variant="danger" size="lg" fullWidth onPress={handleLogout} style={{ marginBottom: spacing.md }}>
           Çıkış Yap
         </Button>
+        </View>
       </ScrollView>
 
       <Modal visible={isEditOpen} animationType="slide" onRequestClose={() => setIsEditOpen(false)}>
@@ -551,6 +582,37 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function StatCard({ value, label }: { value: string; label: string }) {
+  const { colors, radii, spacing, isDark } = useTheme();
+  return (
+    <View
+      style={{
+        flex: 1,
+        borderRadius: radii.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: "hidden",
+      }}
+    >
+      <LinearGradient
+        colors={
+          isDark
+            ? [colors.surface, colors.surfaceElevated]
+            : [colors.surface, colors.backgroundSecondary]
+        }
+        style={{ alignItems: "center", paddingVertical: spacing.md, paddingHorizontal: spacing.sm }}
+      >
+        <Text variant="h2" color={colors.text}>
+          {value}
+        </Text>
+        <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.xs }}>
+          {label}
+        </Text>
+      </LinearGradient>
+    </View>
   );
 }
 

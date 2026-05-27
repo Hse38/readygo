@@ -129,7 +129,9 @@ export default function NewEventScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(1 / 3)).current;
+  const stepDirection = useRef<"forward" | "back">("forward");
 
   const [selectedEventType, setSelectedEventType] = useState<EventType | null>(null);
   const [form, setForm] = useState<FormData>({
@@ -159,12 +161,23 @@ export default function NewEventScreen() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: step / 3,
+      duration: 280,
+      useNativeDriver: false,
+    }).start();
+  }, [step, progressAnim]);
+
   function animateStepChange(nextStep: number) {
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 120, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-    ]).start();
-    setStep(nextStep);
+    stepDirection.current = nextStep > step ? "forward" : "back";
+    const out = stepDirection.current === "forward" ? -40 : 40;
+    const enterFrom = stepDirection.current === "forward" ? 40 : -40;
+    Animated.timing(slideAnim, { toValue: out, duration: 140, useNativeDriver: true }).start(() => {
+      setStep(nextStep);
+      slideAnim.setValue(enterFrom);
+      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 80, useNativeDriver: true }).start();
+    });
   }
 
   function selectEventType(type: EventType) {
@@ -240,7 +253,10 @@ export default function NewEventScreen() {
     }
   }
 
-  const progress = step / 3;
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
   const selectedTransport = TRANSPORT_MODES.find((mode) => mode.value === form.travelMode);
   const isBottomButtonDisabled =
     isSubmitting ||
@@ -267,7 +283,14 @@ export default function NewEventScreen() {
                 backgroundColor: colors.borderLight,
               }}
             >
-              <View style={{ width: `${progress * 100}%`, height: "100%", backgroundColor: colors.primary }} />
+              <Animated.View
+                style={{
+                  width: progressWidth,
+                  height: "100%",
+                  backgroundColor: colors.primary,
+                  borderRadius: radii.full,
+                }}
+              />
             </View>
             <Text variant="caption" color={colors.textTertiary} style={{ marginTop: spacing.xs, textAlign: "right" }}>
               {step} / 3
@@ -280,52 +303,21 @@ export default function NewEventScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Animated.View style={{ opacity: fadeAnim }}>
+            <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
             {step === 1 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
                   {t("newEvent.typeTitle")}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-                  {EVENT_TYPES.map((item) => {
-                    const selected = selectedEventType === item.value;
-                    return (
-                      <Pressable
-                        key={item.value}
-                        onPress={() => selectEventType(item.value)}
-                        style={{
-                          width: "31%",
-                          borderRadius: radii.lg,
-                          borderWidth: selected ? 2 : 1,
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: colors.surface,
-                          alignItems: "center",
-                          paddingVertical: spacing.md,
-                          paddingHorizontal: spacing.xs,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: radii.lg,
-                            backgroundColor: getTintedSurface(item.color, isDark, colors),
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Text style={{ fontSize: 30 }}>{item.emoji}</Text>
-                        </View>
-                        <Text
-                          variant="caption"
-                          color={colors.text}
-                          style={{ marginTop: spacing.sm, textAlign: "center" }}
-                        >
-                          {item.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  {EVENT_TYPES.map((item) => (
+                    <EventTypeCard
+                      key={item.value}
+                      item={item}
+                      selected={selectedEventType === item.value}
+                      onPress={() => selectEventType(item.value)}
+                    />
+                  ))}
                 </View>
               </>
             ) : null}
@@ -506,22 +498,24 @@ export default function NewEventScreen() {
           >
             {step === 3 ? (
               <Button
+                variant="gradient"
+                fullWidth
                 onPress={handleCreateEvent}
                 loading={isSubmitting}
                 disabled={isBottomButtonDisabled}
                 size="lg"
-                style={{ borderRadius: radii.xl, minHeight: 56 }}
               >
                 Etkinliği Oluştur
               </Button>
             ) : (
               <Button
+                variant="gradient"
+                fullWidth
                 onPress={() => {
                   if (validateStep()) animateStepChange(step + 1);
                 }}
                 disabled={isBottomButtonDisabled}
                 size="lg"
-                style={{ borderRadius: radii.xl, minHeight: 56 }}
               >
                 {t("common.next")}
               </Button>
@@ -530,6 +524,63 @@ export default function NewEventScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function EventTypeCard({
+  item,
+  selected,
+  onPress,
+}: {
+  item: EventTypeConfig;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const { colors, spacing, radii, shadows, isDark } = useTheme();
+  const scale = useRef(new Animated.Value(selected ? 1 : 0.95)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: selected ? 1 : 0.95,
+      friction: 6,
+      useNativeDriver: true,
+    }).start();
+  }, [selected, scale]);
+
+  return (
+    <Pressable onPress={onPress} style={{ width: "31%" }}>
+      <Animated.View
+        style={{
+          transform: [{ scale }],
+          borderRadius: radii.lg,
+          borderWidth: 1,
+          borderColor: selected ? colors.primary : colors.border,
+          borderLeftWidth: selected ? 4 : 1,
+          borderLeftColor: selected ? colors.primary : colors.border,
+          backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
+          alignItems: "center",
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.xs,
+          ...shadows.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: radii.lg,
+            backgroundColor: getTintedSurface(item.color, isDark, colors),
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ fontSize: 30 }}>{item.emoji}</Text>
+        </View>
+        <Text variant="caption" color={colors.text} style={{ marginTop: spacing.sm, textAlign: "center" }}>
+          {item.label}
+        </Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
