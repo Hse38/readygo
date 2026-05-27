@@ -9,8 +9,8 @@ import { Text } from "./Text";
 
 export type SelectedLocation = {
   address: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
 };
 
 type Props = {
@@ -18,6 +18,7 @@ type Props = {
   placeholder?: string;
   value: string;
   inputStyle?: StyleProp<TextStyle>;
+  onAddressChange?: (address: string) => void;
   onLocationSelect: (location: SelectedLocation) => void;
 };
 
@@ -26,6 +27,7 @@ export function LocationInput({
   placeholder,
   value,
   inputStyle,
+  onAddressChange,
   onLocationSelect,
 }: Props) {
   const { colors, radii, spacing, typography } = useTheme();
@@ -43,6 +45,11 @@ export function LocationInput({
     setQueryText(value);
   }, [value]);
 
+  function handleTextChange(text: string) {
+    setQueryText(text);
+    onAddressChange?.(text);
+  }
+
   return (
     <View style={{ marginBottom: spacing.md }}>
       <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
@@ -58,16 +65,17 @@ export function LocationInput({
         }}
         textInputProps={{
           value: queryText,
-          onChangeText: setQueryText,
+          onChangeText: handleTextChange,
+          onBlur: () => onAddressChange?.(queryText.trim()),
           placeholderTextColor: colors.textTertiary,
           selectionColor: colors.primary,
           cursorColor: colors.primary,
           underlineColorAndroid: "transparent",
         }}
         onPress={(data, details) => {
-          const lat = details?.geometry?.location?.lat ?? 0;
-          const lng = details?.geometry?.location?.lng ?? 0;
           const address = data.description ?? "";
+          const lat = details?.geometry?.location?.lat ?? null;
+          const lng = details?.geometry?.location?.lng ?? null;
           setQueryText(address);
           onLocationSelect({ address, lat, lng });
         }}
@@ -137,7 +145,8 @@ export function LocationInput({
           <Pressable
             onPress={() => {
               setQueryText("");
-              onLocationSelect({ address: "", lat: 0, lng: 0 });
+              onAddressChange?.("");
+              onLocationSelect({ address: "", lat: null, lng: null });
             }}
             hitSlop={8}
           >

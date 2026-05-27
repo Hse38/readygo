@@ -29,7 +29,12 @@
       "enabled": false
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
       "expo-notifications",
       "expo-location",
       "expo-apple-authentication",

@@ -325,10 +325,15 @@ export default function OnboardingScreen() {
                     value={data.workLocation}
                     placeholder={t("onboarding.workPlaceholder")}
                     inputStyle={{ minHeight: 52, borderRadius: radii.xl }}
+                    onAddressChange={(address) => {
+                      updateField("workLocation", address);
+                      updateField("workLocationLat", null);
+                      updateField("workLocationLng", null);
+                    }}
                     onLocationSelect={({ address, lat, lng }) => {
                       updateField("workLocation", address);
-                      updateField("workLocationLat", address ? lat : null);
-                      updateField("workLocationLng", address ? lng : null);
+                      updateField("workLocationLat", lat);
+                      updateField("workLocationLng", lng);
                     }}
                   />
                 </View>
@@ -418,10 +423,15 @@ export default function OnboardingScreen() {
                     value={data.homeLocation}
                     placeholder={t("onboarding.homePlaceholder")}
                     inputStyle={{ minHeight: 52, borderRadius: radii.xl }}
+                    onAddressChange={(address) => {
+                      updateField("homeLocation", address);
+                      updateField("homeLocationLat", null);
+                      updateField("homeLocationLng", null);
+                    }}
                     onLocationSelect={({ address, lat, lng }) => {
                       updateField("homeLocation", address);
-                      updateField("homeLocationLat", address ? lat : null);
-                      updateField("homeLocationLng", address ? lng : null);
+                      updateField("homeLocationLat", lat);
+                      updateField("homeLocationLng", lng);
                     }}
                   />
                   <View
