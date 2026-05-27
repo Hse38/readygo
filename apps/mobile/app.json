@@ -25,6 +25,9 @@
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
+    "updates": {
+      "enabled": false
+    },
     "plugins": [
       "expo-router",
       "expo-notifications",

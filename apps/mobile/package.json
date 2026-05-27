@@ -43,5 +43,10 @@
     "web": "expo start --web",
     "prebuild": "expo prebuild"
   },
+  "expo": {
+    "install": {
+      "exclude": ["expo-go"]
+    }
+  },
   "private": true
 }
