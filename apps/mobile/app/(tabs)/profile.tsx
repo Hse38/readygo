@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Switch, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Updates from "expo-updates";
 
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -10,6 +11,7 @@ import type { Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
 import { apiFetch } from "../../lib/api";
 import { clearAll, getToken, getUser } from "../../lib/storage";
+import { useTranslation } from "../../lib/i18n";
 
 type EventsResponse = { events: Event[] };
 
@@ -20,11 +22,11 @@ function isUser(value: object | null): value is User {
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { t, locale, setLanguage } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [eventCount, setEventCount] = useState(0);
   const [completedTasks, setCompletedTasks] = useState(0);
-  const [language, setLanguage] = useState<"TR" | "EN">("TR");
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
 
@@ -58,6 +60,15 @@ export default function ProfileScreen() {
     router.replace("/onboarding");
   }
 
+  async function handleLanguageChange(next: "tr" | "en") {
+    await setLanguage(next);
+    try {
+      await Updates.reloadAsync();
+    } catch {
+      // no-op if reload is unavailable
+    }
+  }
+
   const initials = `${user?.name?.[0] ?? ""}${user?.surname?.[0] ?? ""}`.toUpperCase() || "?";
 
   if (isLoading) {
@@ -85,50 +96,50 @@ export default function ProfileScreen() {
             <Text variant="h2" color={colors.white}>{initials}</Text>
           </View>
           <Text variant="h3" style={{ marginTop: spacing.sm }}>
-            {`${user?.name ?? ""} ${user?.surname ?? ""}`.trim() || "Kullanici"}
+            {`${user?.name ?? ""} ${user?.surname ?? ""}`.trim() || t("profile.user")}
           </Text>
           <Text variant="bodySmall" color={colors.textSecondary}>
-            {user?.occupation || "Meslek belirtilmedi"}
+            {user?.occupation || t("profile.professionMissing")}
           </Text>
         </View>
 
         <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
           <Card style={{ flex: 1, alignItems: "center" }}>
             <Text variant="h2">{String(eventCount)}</Text>
-            <Text variant="caption" color={colors.textSecondary}>Etkinlik</Text>
+            <Text variant="caption" color={colors.textSecondary}>{t("profile.events")}</Text>
           </Card>
           <Card style={{ flex: 1, alignItems: "center" }}>
             <Text variant="h2">{String(completedTasks)}</Text>
-            <Text variant="caption" color={colors.textSecondary}>Tamamlanan</Text>
+            <Text variant="caption" color={colors.textSecondary}>{t("profile.completed")}</Text>
           </Card>
         </View>
 
         <Card style={{ marginBottom: spacing.md }}>
-          <InfoRow label="Meslek" value={user?.occupation} />
-          <InfoRow label="Is Konumu" value={user?.workLocation} />
-          <InfoRow label="Ev Konumu" value={user?.homeLocation} />
-          <InfoRow label="Calisma Gunleri" value={user?.workDays?.join(", ")} />
-          <InfoRow label="Ulasim" value={user?.transportMode} />
+          <InfoRow label={t("profile.occupation")} value={user?.occupation} />
+          <InfoRow label={t("profile.workLocation")} value={user?.workLocation} />
+          <InfoRow label={t("profile.homeLocation")} value={user?.homeLocation} />
+          <InfoRow label={t("profile.workDays")} value={user?.workDays?.join(", ")} />
+          <InfoRow label={t("profile.transport")} value={user?.transportMode} />
         </Card>
 
         <Card style={{ marginBottom: spacing.xl }}>
-          <SettingRow label="Dil">
+          <SettingRow label={t("profile.language")}>
             <View style={{ flexDirection: "row", borderRadius: radii.full, backgroundColor: colors.backgroundSecondary, padding: 3 }}>
               <Pressable
-                onPress={() => setLanguage("TR")}
-                style={{ paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.full, backgroundColor: language === "TR" ? colors.primary : "transparent" }}
+                onPress={() => void handleLanguageChange("tr")}
+                style={{ paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.full, backgroundColor: locale === "tr" ? colors.primary : "transparent" }}
               >
-                <Text variant="caption" color={language === "TR" ? colors.white : colors.textSecondary}>TR</Text>
+                <Text variant="caption" color={locale === "tr" ? colors.white : colors.textSecondary}>TR</Text>
               </Pressable>
               <Pressable
-                onPress={() => setLanguage("EN")}
-                style={{ paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.full, backgroundColor: language === "EN" ? colors.primary : "transparent" }}
+                onPress={() => void handleLanguageChange("en")}
+                style={{ paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.full, backgroundColor: locale === "en" ? colors.primary : "transparent" }}
               >
-                <Text variant="caption" color={language === "EN" ? colors.white : colors.textSecondary}>EN</Text>
+                <Text variant="caption" color={locale === "en" ? colors.white : colors.textSecondary}>EN</Text>
               </Pressable>
             </View>
           </SettingRow>
-          <SettingRow label="Dark Mode">
+          <SettingRow label={t("profile.darkMode")}>
             <Switch
               value={darkMode}
               onValueChange={setDarkMode}
@@ -136,7 +147,7 @@ export default function ProfileScreen() {
               thumbColor={darkMode ? colors.primary : colors.surface}
             />
           </SettingRow>
-          <SettingRow label="Bildirimler">
+          <SettingRow label={t("profile.notifications")}>
             <Switch
               value={notifications}
               onValueChange={setNotifications}
@@ -147,7 +158,7 @@ export default function ProfileScreen() {
         </Card>
 
         <Button variant="danger" size="lg" onPress={handleLogout}>
-          Cikis Yap
+          {t("profile.logout")}
         </Button>
       </View>
     </SafeAreaView>
@@ -169,7 +180,7 @@ function SettingRow({
   children,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const { spacing } = useTheme();
   return (

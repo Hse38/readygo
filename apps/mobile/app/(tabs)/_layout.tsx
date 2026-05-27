@@ -2,9 +2,11 @@ import { IconCalendar, IconHome, IconUser } from "@tabler/icons-react-native";
 import { Tabs } from "expo-router";
 
 import { useTheme } from "../../hooks/useTheme";
+import { useTranslation } from "../../lib/i18n";
 
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -26,7 +28,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: "Home",
+          title: t("profile.events"),
           tabBarIcon: ({ color, focused }) => (
             <IconHome size={24} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
@@ -35,7 +37,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: "Calendar",
+          title: t("home.weekView"),
           tabBarIcon: ({ color, focused }) => (
             <IconCalendar size={24} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
@@ -44,7 +46,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("profile.user"),
           tabBarIcon: ({ color, focused }) => (
             <IconUser size={24} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),

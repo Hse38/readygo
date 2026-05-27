@@ -20,24 +20,25 @@ import { LocationInput } from "../components/ui/LocationInput";
 import { Text } from "../components/ui/Text";
 import type { User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
+import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import { getToken, saveUser } from "../lib/storage";
 
 const WEEKDAYS = [
-  { label: "Pzt", value: "monday" },
-  { label: "Sal", value: "tuesday" },
-  { label: "Car", value: "wednesday" },
-  { label: "Per", value: "thursday" },
-  { label: "Cum", value: "friday" },
-  { label: "Cmt", value: "saturday" },
-  { label: "Paz", value: "sunday" },
+  { value: "monday" },
+  { value: "tuesday" },
+  { value: "wednesday" },
+  { value: "thursday" },
+  { value: "friday" },
+  { value: "saturday" },
+  { value: "sunday" },
 ] as const;
 
 const TRANSPORT_MODES = [
-  { icon: "🚶", label: "Yuruyus", value: "walking" },
-  { icon: "🚌", label: "Toplu Tasima", value: "transit" },
-  { icon: "🚗", label: "Arac", value: "driving" },
-  { icon: "🚲", label: "Bisiklet", value: "cycling" },
+  { icon: "🚶", value: "walking" },
+  { icon: "🚌", value: "transit" },
+  { icon: "🚗", value: "driving" },
+  { icon: "🚲", value: "cycling" },
 ] as const;
 
 type TransportMode = (typeof TRANSPORT_MODES)[number]["value"];
@@ -77,6 +78,7 @@ const INITIAL_DATA: OnboardingData = {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(INITIAL_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,19 +98,19 @@ export default function OnboardingScreen() {
 
   function validateStep(): boolean {
     if (step === 1 && (!data.name.trim() || !data.surname.trim())) {
-      Alert.alert("Eksik bilgi", "Lutfen ad ve soyad alanlarini doldurun.");
+      Alert.alert(t("common.missingInfo"), t("onboarding.fillName"));
       return false;
     }
     if (step === 2 && (!data.occupation.trim() || !data.workLocation.trim())) {
-      Alert.alert("Eksik bilgi", "Lutfen meslek ve is konumu alanlarini doldurun.");
+      Alert.alert(t("common.missingInfo"), t("onboarding.fillWork"));
       return false;
     }
     if (step === 3 && (data.workDays.length === 0 || !data.transportMode)) {
-      Alert.alert("Eksik bilgi", "Lutfen calisma gunu ve ulasim tercihi secin.");
+      Alert.alert(t("common.missingInfo"), t("onboarding.fillSchedule"));
       return false;
     }
     if (step === 4 && !data.homeLocation.trim()) {
-      Alert.alert("Eksik bilgi", "Lutfen ev adresinizi girin.");
+      Alert.alert(t("common.missingInfo"), t("onboarding.fillHome"));
       return false;
     }
     return true;
@@ -146,7 +148,10 @@ export default function OnboardingScreen() {
       await saveUser(response.user);
       router.replace("/(tabs)/home");
     } catch (err) {
-      Alert.alert("Hata", err instanceof Error ? err.message : "Profil kaydedilemedi.");
+      Alert.alert(
+        t("common.error"),
+        err instanceof Error ? err.message : t("onboarding.saveProfileFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -189,27 +194,27 @@ export default function OnboardingScreen() {
             {step === 1 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Seni taniyalim
+                  {t("onboarding.step1Title")}
                 </Text>
-                <Input label="Ad" value={data.name} onChangeText={(t) => updateField("name", t)} />
-                <Input label="Soyad" value={data.surname} onChangeText={(t) => updateField("surname", t)} />
+                <Input label={t("onboarding.name")} value={data.name} onChangeText={(txt) => updateField("name", txt)} />
+                <Input label={t("onboarding.surname")} value={data.surname} onChangeText={(txt) => updateField("surname", txt)} />
               </>
             ) : null}
 
             {step === 2 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Is bilgilerin
+                  {t("onboarding.step2Title")}
                 </Text>
                 <Input
-                  label="Meslek"
+                  label={t("onboarding.occupation")}
                   value={data.occupation}
                   onChangeText={(t) => updateField("occupation", t)}
                 />
                 <LocationInput
-                  label="Is Konumu"
+                  label={t("onboarding.workLocation")}
                   value={data.workLocation}
-                  placeholder="Sisli, Istanbul"
+                  placeholder={t("onboarding.workPlaceholder")}
                   onLocationSelect={({ address, lat, lng }) => {
                     updateField("workLocation", address);
                     updateField("workLocationLat", address ? lat : null);
@@ -222,10 +227,10 @@ export default function OnboardingScreen() {
             {step === 3 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Calisma duzenin
+                  {t("onboarding.step3Title")}
                 </Text>
                 <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  Calisma gunleri
+                  {t("onboarding.weekdays")}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }}>
                   {WEEKDAYS.map((day) => {
@@ -249,7 +254,7 @@ export default function OnboardingScreen() {
                         }}
                       >
                         <Text variant="label" color={selected ? colors.white : colors.textSecondary}>
-                          {day.label}
+                          {t(`onboarding.weekdaysShort.${day.value}`)}
                         </Text>
                       </Pressable>
                     );
@@ -257,7 +262,7 @@ export default function OnboardingScreen() {
                 </View>
 
                 <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  Ulasim tercihi
+                  {t("onboarding.transport")}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
                   {TRANSPORT_MODES.map((mode) => {
@@ -278,7 +283,7 @@ export default function OnboardingScreen() {
                       >
                         <Text style={{ fontSize: 24 }}>{mode.icon}</Text>
                         <Text variant="bodySmall" style={{ marginTop: spacing.xs }}>
-                          {mode.label}
+                          {t(`onboarding.transportModes.${mode.value}`)}
                         </Text>
                       </Pressable>
                     );
@@ -290,12 +295,12 @@ export default function OnboardingScreen() {
             {step === 4 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Ev konumun
+                  {t("onboarding.step4Title")}
                 </Text>
                 <LocationInput
-                  label="Ev adresi"
+                  label={t("onboarding.homeAddress")}
                   value={data.homeLocation}
-                  placeholder="Kadikoy, Istanbul"
+                  placeholder={t("onboarding.homePlaceholder")}
                   onLocationSelect={({ address, lat, lng }) => {
                     updateField("homeLocation", address);
                     updateField("homeLocationLat", address ? lat : null);
@@ -310,7 +315,7 @@ export default function OnboardingScreen() {
                     justifyContent: "space-between",
                   }}
                 >
-                  <Text variant="body">Sabah alarmi istiyorum</Text>
+                  <Text variant="body">{t("onboarding.morningAlarm")}</Text>
                   <Switch
                     value={data.morningAlarm}
                     onValueChange={(v) => updateField("morningAlarm", v)}
@@ -324,15 +329,15 @@ export default function OnboardingScreen() {
             {step === 5 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Her sey hazir
+                  {t("onboarding.step5Title")}
                 </Text>
                 <Card>
-                  <SummaryRow label="Ad Soyad" value={`${data.name} ${data.surname}`} />
-                  <SummaryRow label="Meslek" value={data.occupation} />
-                  <SummaryRow label="Is Konumu" value={data.workLocation} />
-                  <SummaryRow label="Calisma Gunleri" value={data.workDays.join(", ")} />
-                  <SummaryRow label="Ulasim" value={data.transportMode || "-"} />
-                  <SummaryRow label="Ev Adresi" value={data.homeLocation} />
+                  <SummaryRow label={t("onboarding.summary.fullName")} value={`${data.name} ${data.surname}`} />
+                  <SummaryRow label={t("onboarding.occupation")} value={data.occupation} />
+                  <SummaryRow label={t("onboarding.workLocation")} value={data.workLocation} />
+                  <SummaryRow label={t("onboarding.summary.workDays")} value={data.workDays.join(", ")} />
+                  <SummaryRow label={t("onboarding.summary.transport")} value={data.transportMode || "-"} />
+                  <SummaryRow label={t("onboarding.summary.homeAddress")} value={data.homeLocation} />
                 </Card>
               </>
             ) : null}
@@ -342,7 +347,7 @@ export default function OnboardingScreen() {
         <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
           {step === 5 ? (
             <Button onPress={handleFinish} loading={isSubmitting} size="lg" style={{ borderRadius: radii.xl }}>
-              Baslayalim
+              {t("onboarding.start")}
             </Button>
           ) : (
             <Button
@@ -352,7 +357,7 @@ export default function OnboardingScreen() {
               size="lg"
               style={{ borderRadius: radii.xl }}
             >
-              Ileri
+              {t("common.next")}
             </Button>
           )}
           {step > 1 ? (
@@ -362,7 +367,7 @@ export default function OnboardingScreen() {
               size="md"
               style={{ marginTop: spacing.sm }}
             >
-              Geri
+              {t("common.back")}
             </Button>
           ) : null}
         </View>

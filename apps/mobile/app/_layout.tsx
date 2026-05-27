@@ -18,6 +18,7 @@ import {
   configureNotificationHandler,
   getEventIdFromNotification,
 } from "../lib/notifications";
+import { initI18n } from "../lib/i18n";
 
 configureNotificationHandler();
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +33,8 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    initI18n();
+
     function navigateToEvent(eventId: string) {
       router.push(`/event/${eventId}`);
     }

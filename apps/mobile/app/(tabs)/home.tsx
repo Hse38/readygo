@@ -28,33 +28,9 @@ import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import type { ChecklistItem, Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
+import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
 import { getToken, getUser } from "../../lib/storage";
-
-const TURKISH_DAYS = [
-  "Pazar",
-  "Pazartesi",
-  "Salı",
-  "Çarşamba",
-  "Perşembe",
-  "Cuma",
-  "Cumartesi",
-];
-const SHORT_WEEK_DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-const TURKISH_MONTHS = [
-  "Ocak",
-  "Şubat",
-  "Mart",
-  "Nisan",
-  "Mayıs",
-  "Haziran",
-  "Temmuz",
-  "Ağustos",
-  "Eylül",
-  "Ekim",
-  "Kasım",
-  "Aralık",
-];
 
 type EventsResponse = { events: Event[] };
 type EventTypeStyle = { backgroundColor: string; dotColor: string; Icon: typeof IconCalendar };
@@ -99,8 +75,13 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
-function formatSelectedDay(date: Date): string {
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]}, ${TURKISH_DAYS[date.getDay()]}`;
+function formatSelectedDay(date: Date, locale: "tr" | "en"): string {
+  const localeTag = locale === "tr" ? "tr-TR" : "en-US";
+  return new Intl.DateTimeFormat(localeTag, {
+    day: "numeric",
+    month: "long",
+    weekday: "long",
+  }).format(date);
 }
 
 function formatEventMeta(dateStr: string, location?: string): string {
@@ -112,14 +93,17 @@ function formatEventMeta(dateStr: string, location?: string): string {
   return location ? `${time} · ${location}` : time;
 }
 
-function getDaysRemainingLabel(dateStr: string): string {
+function getDaysRemainingLabel(
+  dateStr: string,
+  t: (key: string) => string
+): string {
   const today = startOfDay(new Date());
   const eventDate = startOfDay(new Date(dateStr));
   const diffMs = eventDate.getTime() - today.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return "Bugün";
-  if (diffDays < 0) return "Geçti";
-  return `${diffDays} gün`;
+  if (diffDays === 0) return t("home.today");
+  if (diffDays < 0) return t("home.passed");
+  return `${diffDays} ${t("home.days")}`;
 }
 
 function getEventTypeStyle(type: string): EventTypeStyle {
@@ -148,6 +132,7 @@ function getNearestEventWithChecklist(events: Event[]): Event | null {
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, spacing, radii, shadows } = useTheme();
+  const { t, locale } = useTranslation();
   const [events, setEvents] = useState<Event[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +169,7 @@ export default function HomeScreen() {
       const response = await apiFetch<EventsResponse>("/events", {}, token);
       setEvents(response.events ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Etkinlikler yüklenemedi.");
+      setError(err instanceof Error ? err.message : t("home.eventsLoadError"));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -254,7 +239,7 @@ export default function HomeScreen() {
         <View style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center" }}>
           <IconSparkles size={14} color={colors.primary} strokeWidth={2} />
           <Text variant="label" color={colors.primary} style={{ marginLeft: 6 }}>
-            Yapılacaklar
+            {t("home.checklist")}
           </Text>
         </View>
         {incompleteItems.map((item) => (
@@ -333,7 +318,7 @@ export default function HomeScreen() {
             <IconChevronLeft color={colors.textSecondary} size={20} />
           </Pressable>
           <Text variant="label" color={colors.textSecondary}>
-            Hafta Görünümü
+            {t("home.weekView")}
           </Text>
           <Pressable onPress={() => moveWeek("next")} hitSlop={10}>
             <IconChevronRight color={colors.textSecondary} size={20} />
@@ -368,7 +353,9 @@ export default function HomeScreen() {
                 }}
               >
                 <Text variant="caption" color={txtColor}>
-                  {SHORT_WEEK_DAYS[index]}
+                  {new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+                    weekday: "short",
+                  }).format(item)}
                 </Text>
                 <Text variant="label" color={txtColor} style={{ marginTop: 2 }}>
                   {item.getDate()}
@@ -392,7 +379,7 @@ export default function HomeScreen() {
         />
 
         <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-          {formatSelectedDay(selectedDate)}
+          {formatSelectedDay(selectedDate, locale)}
         </Text>
 
         {isLoading ? (
@@ -409,7 +396,7 @@ export default function HomeScreen() {
           <View style={{ alignItems: "center", paddingVertical: spacing.xxxl }}>
             <Text style={{ fontSize: 42 }}>🗓️</Text>
             <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md }}>
-              Bu gün etkinlik yok
+              {t("home.noEvent")}
             </Text>
           </View>
         ) : (
@@ -453,7 +440,11 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Badge variant="primary" size="sm" label={getDaysRemainingLabel(event.date)} />
+                  <Badge
+                    variant="primary"
+                    size="sm"
+                    label={getDaysRemainingLabel(event.date, t)}
+                  />
                 </Card>
                 {showChecklist ? renderChecklistPreview(event) : null}
               </View>

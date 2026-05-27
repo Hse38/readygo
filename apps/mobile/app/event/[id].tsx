@@ -23,6 +23,7 @@ import { Card } from "../../components/ui/Card";
 import { Text } from "../../components/ui/Text";
 import type { ChecklistItem, Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
+import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
 import { getToken, getUser } from "../../lib/storage";
 
@@ -48,21 +49,6 @@ const TRANSPORT_LABELS: Record<string, string> = {
   cycling: "Bisiklet",
 };
 
-const TURKISH_MONTHS = [
-  "Ocak",
-  "Subat",
-  "Mart",
-  "Nisan",
-  "Mayis",
-  "Haziran",
-  "Temmuz",
-  "Agustos",
-  "Eylul",
-  "Ekim",
-  "Kasim",
-  "Aralik",
-];
-
 type EventDetailResponse = { event: Event };
 type TravelStep = {
   type: "transit" | "walking";
@@ -82,16 +68,27 @@ function isUser(value: object | null): value is User {
   return !!value && typeof value === "object" && "name" in value;
 }
 
-function formatEventDateTime(dateStr: string): string {
+function formatEventDateTime(dateStr: string, locale: "tr" | "en"): string {
   const date = new Date(dateStr);
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]} ${date.getFullYear()}, ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
-function formatScheduledAt(dateStr?: string): string | null {
+function formatScheduledAt(dateStr: string | undefined, locale: "tr" | "en"): string | null {
   if (!dateStr) return null;
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return null;
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]}, ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function coordinatePair(lat?: number, lng?: number): string | null {
@@ -103,6 +100,7 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { t, locale } = useTranslation();
   const eventId = typeof id === "string" ? id : id?.[0];
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -135,7 +133,7 @@ export default function EventDetailScreen() {
     const destination = coordinatePair(eventData.locationLat, eventData.locationLng) ?? eventData.location?.trim();
     const mode = eventData.travelMode ?? user?.transportMode ?? "driving";
     if (!origin || !destination) {
-      setTravelError("Konum bilgisi eksik");
+      setTravelError(t("eventDetail.missingLocation"));
       setIsLoadingTravel(false);
       return;
     }
@@ -150,7 +148,7 @@ export default function EventDetailScreen() {
       setTravelInfo(response);
     } catch {
       setTravelInfo(null);
-      setTravelError("Yol suresi alinamadi");
+      setTravelError(t("eventDetail.travelFailed"));
     } finally {
       setIsLoadingTravel(false);
     }
@@ -201,7 +199,7 @@ export default function EventDetailScreen() {
     const originCoords = coordinatePair(storedUser?.homeLocationLat, storedUser?.homeLocationLng);
     const destinationCoords = coordinatePair(event.locationLat, event.locationLng);
     if (!originCoords || !destinationCoords) {
-      Alert.alert("Eksik konum", "Navigasyon icin koordinat bilgisi gerekiyor.");
+      Alert.alert(t("common.error"), t("eventDetail.routeError"));
       return;
     }
     const [toLat, toLng] = destinationCoords.split(",");
@@ -214,7 +212,7 @@ export default function EventDetailScreen() {
     const openUrl = async (url: string) => {
       const supported = await Linking.canOpenURL(url);
       if (!supported) {
-        Alert.alert("Acilamadi", "Uygulama cihazda bulunamadi.");
+      Alert.alert(t("common.error"), t("eventDetail.appMissing"));
         return;
       }
       await Linking.openURL(url);
@@ -222,7 +220,10 @@ export default function EventDetailScreen() {
 
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["Vazgec", "Google Maps", "Yandex Navigasyon", "Apple Haritalar"], cancelButtonIndex: 0 },
+        {
+          options: [t("common.cancel"), t("eventDetail.googleMaps"), t("eventDetail.yandex"), t("eventDetail.appleMaps")],
+          cancelButtonIndex: 0,
+        },
         (index) => {
           if (index === 1) void openUrl(urls.google);
           if (index === 2) void openUrl(urls.yandex);
@@ -230,10 +231,10 @@ export default function EventDetailScreen() {
         }
       );
     } else {
-      Alert.alert("Yol Tarifi Al", "Uygulama secin", [
-        { text: "Google Maps", onPress: () => void openUrl(urls.google) },
-        { text: "Yandex Navigasyon", onPress: () => void openUrl(urls.yandex) },
-        { text: "Iptal", style: "cancel" },
+      Alert.alert(t("eventDetail.route"), t("eventDetail.routeSelect"), [
+        { text: t("eventDetail.googleMaps"), onPress: () => void openUrl(urls.google) },
+        { text: t("eventDetail.yandex"), onPress: () => void openUrl(urls.yandex) },
+        { text: t("common.cancel"), style: "cancel" },
       ]);
     }
   }
@@ -249,8 +250,8 @@ export default function EventDetailScreen() {
             <Text variant="h3" color={colors.primary}>←</Text>
           </Pressable>
           <Text style={{ fontSize: 30, marginRight: spacing.sm }}>{typeMeta.emoji}</Text>
-          <Text variant="h2" style={{ flex: 1 }}>
-            {event?.title ?? "Etkinlik"}
+            <Text variant="h2" style={{ flex: 1 }}>
+            {event?.title ?? t("profile.events")}
           </Text>
         </View>
 
@@ -263,7 +264,7 @@ export default function EventDetailScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.lg }}>
               <IconClock size={16} color={colors.textSecondary} />
               <Text variant="body" color={colors.textSecondary} style={{ marginLeft: spacing.xs }}>
-                {formatEventDateTime(event.date)}
+                {formatEventDateTime(event.date, locale)}
               </Text>
             </View>
 
@@ -272,7 +273,7 @@ export default function EventDetailScreen() {
                 <ActivityIndicator color={colors.primary} />
               ) : travelInfo ? (
                 <>
-                  <Text variant="label" color={colors.textSecondary}>Evden cik</Text>
+                  <Text variant="label" color={colors.textSecondary}>{t("eventDetail.leaveHome")}</Text>
                   <Text variant="h1" style={{ marginTop: spacing.xs }}>
                     {new Date(travelInfo.departureTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
@@ -304,18 +305,18 @@ export default function EventDetailScreen() {
                   ) : null}
 
                   <Button onPress={() => void openDirections(travelMode)} variant="secondary" style={{ marginTop: spacing.md }}>
-                    Yol Tarifi Al
+                    {t("eventDetail.route")}
                   </Button>
                 </>
               ) : (
                 <Text variant="bodySmall" color={colors.textSecondary}>
-                  {travelError ?? "Yol bilgisi yok"}
+                  {travelError ?? t("eventDetail.travelUnavailable")}
                 </Text>
               )}
             </Card>
 
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
-              <Text variant="h3">Yapilacaklar</Text>
+              <Text variant="h3">{t("eventDetail.checklist")}</Text>
               <IconSparkles size={18} color={colors.primary} style={{ marginLeft: spacing.xs }} />
             </View>
             <Card>
@@ -348,9 +349,9 @@ export default function EventDetailScreen() {
                     >
                       {item.title}
                     </Text>
-                    {formatScheduledAt(item.scheduledAt) ? (
+                    {formatScheduledAt(item.scheduledAt, locale) ? (
                       <Text variant="caption" color={colors.textTertiary}>
-                        {formatScheduledAt(item.scheduledAt)}
+                        {formatScheduledAt(item.scheduledAt, locale)}
                       </Text>
                     ) : null}
                   </View>
