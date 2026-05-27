@@ -9,25 +9,101 @@ export interface GeneratedChecklistItem {
   order: number;
 }
 
-const SYSTEM_PROMPT = `You are a smart event preparation assistant. Given an event, generate a preparation checklist with smart scheduling.
+const SYSTEM_PROMPT = `You are a smart event preparation assistant for Turkish users.
+Generate a detailed, practical preparation checklist based on the event type.
+Return ONLY a JSON array, no markdown:
+[{ "title": "task", "scheduledAt": "ISO datetime", "order": number }]
 
-Return ONLY a JSON array, no markdown, no explanation:
-[
-  {
-    "title": "task title",
-    "scheduledAt": "ISO datetime string",
-    "order": number
-  }
-]
+EVENT-SPECIFIC RULES:
 
-Rules:
-- For flights: include "Pack luggage" (3 days before), "Online check-in" (exactly 24h before departure), "Leave home" (calculated from travelMode), "Arrive at airport" (90 min before)
-- For exams: include study reminders (1 week, 3 days, 1 day before), "Prepare materials" (night before), "Leave home" (travel time before)
-- For weddings: include "Prepare outfit" (1 week before), "Buy gift" (3 days before), "Leave home" (travel time before)
-- For doctor: include "Prepare documents" (1 day before), "Leave home" (travel time before)
-- For other types: generate 3-6 sensible preparation tasks
-- "Leave home" scheduledAt must account for travelMode: walking=slower, transit=moderate, driving=faster
-- All times must be before the event date`;
+FLIGHT (uçuş):
+- "Bavul hazırla" → 3 days before
+- "Online check-in yap" → exactly 24h before departure
+- "Pasaport/kimlik kontrol et" → 2 days before
+- "Havalimanı ulaşımını planla" → 1 day before
+- "Evden çık" → calculated from travel time
+- "Havalimanında ol" → 90 min before (domestic), 2h (international)
+
+EXAM (sınav):
+- "Çalışma programı oluştur" → 1 week before
+- "Konu tekrarı yap" → 3 days before
+- "Son tekrar" → 1 day before
+- "Kırtasiye malzemelerini hazırla" → night before (kalem, silgi, kimlik)
+- "Erken uyu" → night before
+- "Kahvaltı yap" → morning of exam
+- "Evden çık" → calculated from travel time
+
+WEDDING (düğün):
+- "Davetiyeyi kontrol et" → 1 week before
+- "Kıyafet seç ve hazırla" → 1 week before
+- "Hediye al" → 3 days before
+- "Ulaşım planla" → 2 days before
+- "Kıyafeti ütüle" → night before
+- "Evden çık" → calculated
+
+DOCTOR (doktor):
+- "Sigorta kartını hazırla" → 1 day before
+- "Önceki raporları topla" → 1 day before
+- "Randevu saatini onayla" → 1 day before
+- "Aç mı tok mu gidilmeli kontrol et" → 1 day before
+- "Evden çık" → calculated
+
+MEETING (toplantı):
+- "Gündem hazırla" → 1 day before
+- "Sunum/dokümanları hazırla" → 1 day before
+- "Katılımcılara hatırlatma gönder" → morning of meeting
+- "Teknik ekipmanları kontrol et" → 30 min before
+- "Evden çık" → calculated
+
+CONCERT (konser):
+- "Bileti kontrol et" → 1 day before
+- "Kıyafet seç" → 1 day before
+- "Ulaşım planla" → 1 day before
+- "Evden çık" → calculated
+
+TRAVEL (seyahat):
+- "Valize eşyaları topla" → 3 days before
+- "Pasaport/vize kontrol et" → 1 week before
+- "Otel rezervasyonunu onayla" → 2 days before
+- "Ulaşım biletlerini kontrol et" → 1 day before
+- "Ev/iş işlerini tamamla" → 1 day before
+- "Evden çık" → calculated
+
+SPORT (spor):
+- "Spor kıyafetlerini hazırla" → night before
+- "Su ve atıştırmalık hazırla" → morning of event
+- "Ekipmanları kontrol et" → night before
+- "Evden çık" → calculated
+
+BIRTHDAY (doğum günü):
+- "Hediye al" → 3 days before
+- "Kart/mesaj hazırla" → 1 day before
+- "Kıyafet seç" → 1 day before
+- "Evden çık" → calculated
+
+CEREMONY (tören):
+- "Davetiyeyi kontrol et" → 1 week before
+- "Kıyafet hazırla" → 3 days before
+- "Hediye/çiçek al" → 1 day before
+- "Evden çık" → calculated
+
+LEGAL (resmi işlem):
+- "Gerekli belgeleri listele" → 3 days before
+- "Belgelerin fotokopisini çek" → 1 day before
+- "Randevuyu onayla" → 1 day before
+- "Evden çık" → calculated
+
+OTHER (diğer):
+- Generate 4-6 sensible preparation tasks based on the event title
+- Include "Evden çık" if location is provided
+
+GENERAL RULES:
+- All task titles must be in Turkish
+- "Evden çık" scheduledAt = eventTime minus travelDuration
+- All times must be BEFORE the event date
+- Never schedule tasks after the event
+- Return minimum 4, maximum 8 tasks
+- Order tasks chronologically`;
 
 interface RawChecklistItem {
   title?: string;
@@ -63,10 +139,107 @@ function getTravelMode(event: Event, user: User): string {
   return event.travelMode ?? user.transportMode ?? "driving";
 }
 
+function isLeaveHomeTask(title: string): boolean {
+  const lower = title.toLocaleLowerCase("tr");
+  return (
+    lower.includes("evden çık") ||
+    lower.includes("evden cik") ||
+    lower.includes("leave home")
+  );
+}
+
+function hasLocation(event: Event): boolean {
+  return Boolean(event.location?.trim()) || (event.locationLat != null && event.locationLng != null);
+}
+
+type ChecklistTemplate = { title: string; offsetMs: number }[];
+
+const FALLBACK_BY_TYPE: Record<string, ChecklistTemplate> = {
+  flight: [
+    { title: "Bavul hazırla", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Pasaport/kimlik kontrol et", offsetMs: 2 * 24 * 60 * 60 * 1000 },
+    { title: "Havalimanı ulaşımını planla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Online check-in yap", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Havalimanında ol", offsetMs: 90 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  exam: [
+    { title: "Çalışma programı oluştur", offsetMs: 7 * 24 * 60 * 60 * 1000 },
+    { title: "Konu tekrarı yap", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Son tekrar", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Kırtasiye malzemelerini hazırla", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Erken uyu", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Kahvaltı yap", offsetMs: 2 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  wedding: [
+    { title: "Davetiyeyi kontrol et", offsetMs: 7 * 24 * 60 * 60 * 1000 },
+    { title: "Kıyafet seç ve hazırla", offsetMs: 7 * 24 * 60 * 60 * 1000 },
+    { title: "Hediye al", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Ulaşım planla", offsetMs: 2 * 24 * 60 * 60 * 1000 },
+    { title: "Kıyafeti ütüle", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  doctor: [
+    { title: "Sigorta kartını hazırla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Önceki raporları topla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Randevu saatini onayla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Aç mı tok mu gidilmeli kontrol et", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  meeting: [
+    { title: "Gündem hazırla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Sunum/dokümanları hazırla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Katılımcılara hatırlatma gönder", offsetMs: 3 * 60 * 60 * 1000 },
+    { title: "Teknik ekipmanları kontrol et", offsetMs: 30 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  concert: [
+    { title: "Bileti kontrol et", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Kıyafet seç", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Ulaşım planla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  travel: [
+    { title: "Pasaport/vize kontrol et", offsetMs: 7 * 24 * 60 * 60 * 1000 },
+    { title: "Valize eşyaları topla", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Otel rezervasyonunu onayla", offsetMs: 2 * 24 * 60 * 60 * 1000 },
+    { title: "Ulaşım biletlerini kontrol et", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Ev/iş işlerini tamamla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  sport: [
+    { title: "Ekipmanları kontrol et", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Spor kıyafetlerini hazırla", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Su ve atıştırmalık hazırla", offsetMs: 2 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  birthday: [
+    { title: "Hediye al", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Kart/mesaj hazırla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Kıyafet seç", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  ceremony: [
+    { title: "Davetiyeyi kontrol et", offsetMs: 7 * 24 * 60 * 60 * 1000 },
+    { title: "Kıyafet hazırla", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Hediye/çiçek al", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+  legal: [
+    { title: "Gerekli belgeleri listele", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Belgelerin fotokopisini çek", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Randevuyu onayla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Evden çık", offsetMs: 45 * 60 * 1000 },
+  ],
+};
+
 function buildDefaultChecklist(event: Event, user: User): GeneratedChecklistItem[] {
   const eventDate = new Date(event.date);
-  const travelMode = getTravelMode(event, user);
+  const typeKey = event.type.toLowerCase();
+  const template = FALLBACK_BY_TYPE[typeKey];
 
+  const travelMode = getTravelMode(event, user);
   const leaveHomeOffset =
     travelMode === "walking"
       ? 60 * 60 * 1000
@@ -74,23 +247,37 @@ function buildDefaultChecklist(event: Event, user: User): GeneratedChecklistItem
         ? 45 * 60 * 1000
         : 30 * 60 * 1000;
 
-  return [
-    {
-      title: "Review event details",
-      scheduledAt: subtractMs(eventDate, 24 * 60 * 60 * 1000),
-      order: 1,
-    },
-    {
-      title: "Prepare essentials",
-      scheduledAt: subtractMs(eventDate, 12 * 60 * 60 * 1000),
-      order: 2,
-    },
-    {
-      title: "Leave home",
-      scheduledAt: subtractMs(eventDate, leaveHomeOffset),
-      order: 3,
-    },
+  if (template) {
+    const items = template
+      .filter((entry) => isLeaveHomeTask(entry.title) ? hasLocation(event) : true)
+      .map((entry, index) => ({
+        title: entry.title,
+        scheduledAt: subtractMs(
+          eventDate,
+          entry.title === "Evden çık" ? leaveHomeOffset : entry.offsetMs
+        ),
+        order: index + 1,
+      }));
+
+    return items.slice(0, 8);
+  }
+
+  const generic: ChecklistTemplate = [
+    { title: "Etkinlik detaylarını gözden geçir", offsetMs: 3 * 24 * 60 * 60 * 1000 },
+    { title: "Gerekli malzemeleri hazırla", offsetMs: 24 * 60 * 60 * 1000 },
+    { title: "Kıyafet ve eşyaları hazırla", offsetMs: 12 * 60 * 60 * 1000 },
+    { title: "Ulaşım planla", offsetMs: 24 * 60 * 60 * 1000 },
   ];
+
+  if (hasLocation(event)) {
+    generic.push({ title: "Evden çık", offsetMs: leaveHomeOffset });
+  }
+
+  return generic.map((entry, index) => ({
+    title: entry.title,
+    scheduledAt: subtractMs(eventDate, entry.offsetMs),
+    order: index + 1,
+  }));
 }
 
 function parseGeminiJson(text: string): RawChecklistItem[] | null {
@@ -131,7 +318,8 @@ function normalizeItems(
     });
   }
 
-  return items.sort((a, b) => a.order - b.order);
+  const sorted = items.sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime());
+  return sorted.slice(0, 8).map((item, index) => ({ ...item, order: index + 1 }));
 }
 
 async function adjustLeaveHomeItems(
@@ -148,13 +336,10 @@ async function adjustLeaveHomeItems(
 
   const travel = await mapsService.getTravelTime(origin, destination, travelMode);
   const bufferMs = 10 * 60 * 1000;
-  const leaveAt = subtractMs(
-    eventDate,
-    travel.durationSeconds * 1000 + bufferMs
-  );
+  const leaveAt = subtractMs(eventDate, travel.durationSeconds * 1000 + bufferMs);
 
   return items.map((item) => {
-    if (!item.title.toLowerCase().includes("leave home")) return item;
+    if (!isLeaveHomeTask(item.title)) return item;
     return { ...item, scheduledAt: leaveAt };
   });
 }
@@ -171,8 +356,12 @@ async function callGemini(event: Event, user: User): Promise<GeneratedChecklistI
     eventTitle: event.title,
     eventDate: event.date.toISOString(),
     eventLocation: event.location,
+    hasLocation: hasLocation(event),
     travelMode: getTravelMode(event, user),
     userHomeLocation: user.homeLocation,
+    locale: "tr",
+    instructions:
+      "Follow EVENT-SPECIFIC RULES for the given eventType. Use Turkish titles only. Include Evden çık only when hasLocation is true.",
   });
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -189,7 +378,7 @@ async function callGemini(event: Event, user: User): Promise<GeneratedChecklistI
 
   const eventDate = new Date(event.date);
   const items = normalizeItems(raw, eventDate);
-  return items.length > 0 ? items : null;
+  return items.length >= 4 ? items : null;
 }
 
 export async function generateChecklist(
