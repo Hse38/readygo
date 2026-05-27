@@ -211,7 +211,7 @@ function Particle({
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { colors, spacing, isDark } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
@@ -355,7 +355,7 @@ export default function AuthScreen() {
           </Text>
         </View>
 
-        <View style={[styles.bottomSection, { paddingHorizontal: spacing.xl }]}>
+        <View style={styles.bottomSection}>
           <Text variant="caption" color={colors.textSecondary} style={styles.signInLabel}>
             {t("auth.signInPrompt")}
           </Text>
@@ -372,10 +372,12 @@ export default function AuthScreen() {
             {isLoading ? (
               <ActivityIndicator color={GOOGLE_BUTTON_TEXT} />
             ) : (
-              <View style={styles.googleButtonInner}>
-                <GoogleGIcon size={22} />
+              <>
+                <View style={styles.googleIconLeft}>
+                  <GoogleGIcon size={20} />
+                </View>
                 <Text style={styles.googleButtonText}>{t("auth.google")}</Text>
-              </View>
+              </>
             )}
           </Pressable>
 
@@ -427,6 +429,7 @@ const styles = StyleSheet.create({
     minHeight: "35%",
     justifyContent: "flex-end",
     paddingBottom: 8,
+    paddingHorizontal: 24,
   },
   signInLabel: {
     textAlign: "center",
@@ -434,18 +437,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   googleButton: {
-    flexDirection: "row",
+    alignSelf: "stretch",
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    width: "100%",
-    height: 54,
-    borderRadius: 9999,
-    backgroundColor: "#FFFFFF",
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   googleButtonPressed: {
     opacity: 0.92,
@@ -454,15 +456,20 @@ const styles = StyleSheet.create({
   googleButtonDisabled: {
     opacity: 0.55,
   },
-  googleButtonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  googleIconLeft: {
+    position: "absolute",
+    left: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
   },
   googleButtonText: {
+    width: "100%",
+    textAlign: "center",
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: GOOGLE_BUTTON_TEXT,
+    paddingHorizontal: 52,
   },
   soonHint: {
     textAlign: "center",
