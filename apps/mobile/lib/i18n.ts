@@ -6,7 +6,8 @@ import { translations } from "../constants/translations";
 
 type AppLocale = "tr" | "en";
 
-const STORAGE_KEY = "readygo_language";
+const STORAGE_KEY = "language";
+const LEGACY_STORAGE_KEY = "readygo_language";
 const DEFAULT_LOCALE: AppLocale = "tr";
 
 const i18n = new I18n(translations);
@@ -24,9 +25,23 @@ function notify(locale: AppLocale) {
   listeners.forEach((listener) => listener(locale));
 }
 
-export async function initI18n(): Promise<void> {
+async function readSavedLocale(): Promise<AppLocale | null> {
   const saved = await AsyncStorage.getItem(STORAGE_KEY);
-  const locale = isAppLocale(saved) ? saved : DEFAULT_LOCALE;
+  if (isAppLocale(saved)) return saved;
+
+  const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+  if (isAppLocale(legacy)) {
+    await AsyncStorage.setItem(STORAGE_KEY, legacy);
+    await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+    return legacy;
+  }
+
+  return null;
+}
+
+export async function initI18n(): Promise<void> {
+  const saved = await readSavedLocale();
+  const locale = saved ?? DEFAULT_LOCALE;
   i18n.locale = locale;
   notify(locale);
 }

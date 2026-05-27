@@ -360,9 +360,10 @@ export default function ProfileScreen() {
         </Card>
 
         <Card style={{ marginBottom: spacing.md }}>
-          <SettingRow label={t("profile.language")}>
+          <SettingRow label="Dil / Language">
             <View style={{ flexDirection: "row", gap: spacing.xs }}>
               <Pressable
+                accessibilityLabel={t("profile.turkish")}
                 onPress={() => void handleLanguageChange("tr")}
                 style={{
                   paddingHorizontal: spacing.md,
@@ -376,6 +377,7 @@ export default function ProfileScreen() {
                 </Text>
               </Pressable>
               <Pressable
+                accessibilityLabel={t("profile.english")}
                 onPress={() => void handleLanguageChange("en")}
                 style={{
                   paddingHorizontal: spacing.md,
