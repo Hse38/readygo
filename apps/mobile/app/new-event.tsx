@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { LocationInput } from "../components/ui/LocationInput";
 import type { ChecklistItem, Event, User } from "../constants/types";
 import { apiFetch } from "../lib/api";
 import {
@@ -75,6 +76,8 @@ type FormData = {
   eventDate: Date;
   eventTime: Date;
   location: string;
+  locationLat: number | null;
+  locationLng: number | null;
   travelMode: TransportMode | "";
 };
 
@@ -155,6 +158,8 @@ export default function NewEventScreen() {
     eventDate: new Date(),
     eventTime: new Date(),
     location: "",
+    locationLat: null,
+    locationLng: null,
     travelMode: "",
   });
 
@@ -257,6 +262,8 @@ export default function NewEventScreen() {
         type: form.type,
         date: combinedDate.toISOString(),
         location: form.location.trim() || undefined,
+        locationLat: form.locationLat ?? undefined,
+        locationLng: form.locationLng ?? undefined,
         travelMode: form.travelMode || undefined,
       };
 
@@ -412,11 +419,15 @@ export default function NewEventScreen() {
               ) : null}
             </View>
 
-            <InputField
+            <LocationInput
               label="Konum"
               value={form.location}
-              onChangeText={(text) => updateForm("location", text)}
               placeholder="Sabiha Gökçen Havalimanı"
+              onLocationSelect={({ address, lat, lng }) => {
+                updateForm("location", address);
+                updateForm("locationLat", address ? lat : null);
+                updateForm("locationLng", address ? lng : null);
+              }}
             />
 
             <Text className="mb-3 text-sm font-medium text-gray-700">

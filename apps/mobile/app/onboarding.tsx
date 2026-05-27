@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch } from "../lib/api";
 import { getToken, saveUser } from "../lib/storage";
 import type { User } from "../constants/types";
+import { LocationInput } from "../components/ui/LocationInput";
 
 const PRIMARY = "#AFA9EC";
 
@@ -44,9 +45,13 @@ type OnboardingData = {
   surname: string;
   occupation: string;
   workLocation: string;
+  workLocationLat: number | null;
+  workLocationLng: number | null;
   workDays: string[];
   transportMode: TransportMode | "";
   homeLocation: string;
+  homeLocationLat: number | null;
+  homeLocationLng: number | null;
   morningAlarm: boolean;
 };
 
@@ -59,9 +64,13 @@ const INITIAL_DATA: OnboardingData = {
   surname: "",
   occupation: "",
   workLocation: "",
+  workLocationLat: null,
+  workLocationLng: null,
   workDays: [],
   transportMode: "",
   homeLocation: "",
+  homeLocationLat: null,
+  homeLocationLng: null,
   morningAlarm: false,
 };
 
@@ -195,7 +204,11 @@ export default function OnboardingScreen() {
       surname: data.surname.trim(),
       occupation: data.occupation.trim(),
       workLocation: data.workLocation.trim(),
+      workLocationLat: data.workLocationLat ?? undefined,
+      workLocationLng: data.workLocationLng ?? undefined,
       homeLocation: data.homeLocation.trim(),
+      homeLocationLat: data.homeLocationLat ?? undefined,
+      homeLocationLng: data.homeLocationLng ?? undefined,
       workDays: data.workDays,
       transportMode: data.transportMode,
       morningAlarm: data.morningAlarm,
@@ -269,11 +282,15 @@ export default function OnboardingScreen() {
               value={data.occupation}
               onChangeText={(text) => updateField("occupation", text)}
             />
-            <InputField
+            <LocationInput
               label="İş Konumu"
               value={data.workLocation}
-              onChangeText={(text) => updateField("workLocation", text)}
               placeholder="Şişli, İstanbul"
+              onLocationSelect={({ address, lat, lng }) => {
+                updateField("workLocation", address);
+                updateField("workLocationLat", address ? lat : null);
+                updateField("workLocationLng", address ? lng : null);
+              }}
             />
           </>
         );
@@ -345,11 +362,15 @@ export default function OnboardingScreen() {
             <Text className="mb-6 text-2xl font-bold text-gray-900">
               Ev konumun
             </Text>
-            <InputField
+            <LocationInput
               label="Ev adresi"
               value={data.homeLocation}
-              onChangeText={(text) => updateField("homeLocation", text)}
               placeholder="Kadıköy, İstanbul"
+              onLocationSelect={({ address, lat, lng }) => {
+                updateField("homeLocation", address);
+                updateField("homeLocationLat", address ? lat : null);
+                updateField("homeLocationLng", address ? lng : null);
+              }}
             />
             <Pressable
               onPress={() => updateField("morningAlarm", !data.morningAlarm)}

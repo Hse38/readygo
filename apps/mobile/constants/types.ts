@@ -5,7 +5,11 @@ export type User = {
   surname: string;
   occupation?: string;
   workLocation?: string;
+  workLocationLat?: number;
+  workLocationLng?: number;
   homeLocation?: string;
+  homeLocationLat?: number;
+  homeLocationLng?: number;
   workDays?: string[];
   transportMode?: string;
   morningAlarm?: boolean;
