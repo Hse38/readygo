@@ -266,7 +266,10 @@ export default function EventDetailScreen() {
         contentContainerClassName="pb-8"
         showsVerticalScrollIndicator={false}
       >
-        <Pressable onPress={() => router.back()} className="mb-4 pt-2">
+        <Pressable
+          onPress={() => router.replace("/(tabs)/home")}
+          className="mb-4 pt-2"
+        >
           <Text className="text-2xl" style={{ color: PRIMARY }}>
             ←
           </Text>

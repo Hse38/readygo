@@ -196,7 +196,7 @@ export default function NewEventScreen() {
 
   function handleTopBack() {
     if (step === 1) {
-      router.back();
+      router.replace("/(tabs)/home");
       return;
     }
     animateStepChange(step - 1);
