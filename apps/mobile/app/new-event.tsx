@@ -49,21 +49,107 @@ type EventTypeConfig = {
   emoji: string;
   label: string;
   color: string;
+  titlePlaceholder: string;
+  locationPlaceholder: string;
 };
 
 const TYPE_CONFIG: Record<EventType, EventTypeConfig> = {
-  flight: { value: "flight", emoji: "✈️", label: "Uçuş", color: "#EEF2FF" },
-  exam: { value: "exam", emoji: "📝", label: "Sınav", color: "#F0FDF4" },
-  wedding: { value: "wedding", emoji: "💍", label: "Düğün", color: "#FDF4FF" },
-  doctor: { value: "doctor", emoji: "🏥", label: "Doktor", color: "#FFF1F2" },
-  meeting: { value: "meeting", emoji: "👔", label: "Toplantı", color: "#FFFBEB" },
-  concert: { value: "concert", emoji: "🎵", label: "Konser", color: "#F0F9FF" },
-  travel: { value: "travel", emoji: "🧳", label: "Seyahat", color: "#FFF7ED" },
-  sport: { value: "sport", emoji: "🏋️", label: "Spor", color: "#F0FDF4" },
-  birthday: { value: "birthday", emoji: "🎂", label: "Doğum Günü", color: "#FDF4FF" },
-  ceremony: { value: "ceremony", emoji: "🎓", label: "Tören", color: "#FFFBEB" },
-  legal: { value: "legal", emoji: "⚖️", label: "Resmi İşlem", color: "#F8FAFC" },
-  other: { value: "other", emoji: "📌", label: "Diğer", color: "#F8F8F8" },
+  flight: {
+    value: "flight",
+    emoji: "✈️",
+    label: "Uçuş",
+    color: "#EEF2FF",
+    titlePlaceholder: "Kayseri Uçuşu",
+    locationPlaceholder: "Sabiha Gökçen Havalimanı",
+  },
+  exam: {
+    value: "exam",
+    emoji: "📝",
+    label: "Sınav",
+    color: "#F0FDF4",
+    titlePlaceholder: "Matematik Sınavı",
+    locationPlaceholder: "Sınav Salonu",
+  },
+  wedding: {
+    value: "wedding",
+    emoji: "💍",
+    label: "Düğün",
+    color: "#FDF4FF",
+    titlePlaceholder: "Ahmet ve Ayşe'nin Düğünü",
+    locationPlaceholder: "Düğün Salonu",
+  },
+  doctor: {
+    value: "doctor",
+    emoji: "🏥",
+    label: "Doktor",
+    color: "#FFF1F2",
+    titlePlaceholder: "Diş Hekimi Randevusu",
+    locationPlaceholder: "Hastane / Klinik",
+  },
+  meeting: {
+    value: "meeting",
+    emoji: "👔",
+    label: "Toplantı",
+    color: "#FFFBEB",
+    titlePlaceholder: "Proje Toplantısı",
+    locationPlaceholder: "Toplantı Odası / Ofis",
+  },
+  concert: {
+    value: "concert",
+    emoji: "🎵",
+    label: "Konser",
+    color: "#F0F9FF",
+    titlePlaceholder: "Coldplay Konseri",
+    locationPlaceholder: "Konser Alanı",
+  },
+  travel: {
+    value: "travel",
+    emoji: "🧳",
+    label: "Seyahat",
+    color: "#FFF7ED",
+    titlePlaceholder: "İstanbul Seyahati",
+    locationPlaceholder: "Varış Noktası",
+  },
+  sport: {
+    value: "sport",
+    emoji: "🏋️",
+    label: "Spor",
+    color: "#F0FDF4",
+    titlePlaceholder: "Spor Antrenmanı",
+    locationPlaceholder: "Spor Salonu / Antrenman Alanı",
+  },
+  birthday: {
+    value: "birthday",
+    emoji: "🎂",
+    label: "Doğum Günü",
+    color: "#FDF4FF",
+    titlePlaceholder: "Can'ın Doğum Günü",
+    locationPlaceholder: "Parti Mekanı",
+  },
+  ceremony: {
+    value: "ceremony",
+    emoji: "🎓",
+    label: "Tören",
+    color: "#FFFBEB",
+    titlePlaceholder: "Mezuniyet Töreni",
+    locationPlaceholder: "Tören Salonu",
+  },
+  legal: {
+    value: "legal",
+    emoji: "⚖️",
+    label: "Resmi İşlem",
+    color: "#F8FAFC",
+    titlePlaceholder: "Noter Randevusu",
+    locationPlaceholder: "Kurum Adresi",
+  },
+  other: {
+    value: "other",
+    emoji: "📌",
+    label: "Diğer",
+    color: "#F8F8F8",
+    titlePlaceholder: "Etkinlik Başlığı",
+    locationPlaceholder: "Konum (isteğe bağlı)",
+  },
 };
 
 const EVENT_TYPES = Object.values(TYPE_CONFIG);
@@ -146,6 +232,7 @@ export default function NewEventScreen() {
   });
 
   const selectedTypeConfig = selectedEventType ? TYPE_CONFIG[selectedEventType] : null;
+  const placeholderConfig = selectedTypeConfig ?? TYPE_CONFIG.other;
 
   useEffect(() => {
     async function loadDefaultTransport() {
@@ -331,7 +418,7 @@ export default function NewEventScreen() {
                   label={t("newEvent.title")}
                   value={form.title}
                   onChangeText={(value) => updateForm("title", value)}
-                  placeholder={t("newEvent.titlePlaceholder")}
+                  placeholder={placeholderConfig.titlePlaceholder}
                 />
 
                 <Card style={{ marginBottom: spacing.md }}>
@@ -403,7 +490,7 @@ export default function NewEventScreen() {
                 <LocationInput
                   label={t("newEvent.location")}
                   value={form.location}
-                  placeholder={t("newEvent.locationPlaceholder")}
+                  placeholder={placeholderConfig.locationPlaceholder}
                   onLocationSelect={({ address, lat, lng }) => {
                     updateForm("location", address);
                     updateForm("locationLat", address ? lat : null);
@@ -412,35 +499,43 @@ export default function NewEventScreen() {
                 />
 
                 <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  Ulaşım
+                  {t("newEvent.transport")}
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                    {TRANSPORT_MODES.map((mode) => {
-                      const selected = form.travelMode === mode.value;
-                      return (
-                        <Pressable
-                          key={mode.value}
-                          onPress={() => updateForm("travelMode", mode.value)}
-                          style={{
-                            borderRadius: radii.full,
-                            borderWidth: 1,
-                            borderColor: selected ? colors.primary : colors.border,
-                            backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: spacing.sm,
-                            flexDirection: "row",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text>{mode.icon}</Text>
-                          <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
-                            {mode.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingRight: spacing.lg,
+                    gap: spacing.sm,
+                  }}
+                >
+                  {TRANSPORT_MODES.map((mode) => {
+                    const selected = form.travelMode === mode.value;
+                    return (
+                      <Pressable
+                        key={mode.value}
+                        onPress={() => updateForm("travelMode", mode.value)}
+                        style={{
+                          borderRadius: radii.full,
+                          borderWidth: 1,
+                          borderColor: selected ? colors.primary : colors.border,
+                          backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
+                          paddingHorizontal: spacing.md,
+                          paddingVertical: spacing.sm,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Text>{mode.icon}</Text>
+                        <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
+                          {mode.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </ScrollView>
               </>
             ) : null}
