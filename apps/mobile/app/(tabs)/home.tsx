@@ -23,7 +23,7 @@ import {
   ScrollView,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
@@ -581,7 +581,8 @@ function FloatingEmptyIllustration() {
 }
 
 function PulsingFab({ onPress }: { onPress: () => void }) {
-  const { colors, spacing, radii, shadows } = useTheme();
+  const { colors, radii, shadows } = useTheme();
+  const insets = useSafeAreaInsets();
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -599,8 +600,8 @@ function PulsingFab({ onPress }: { onPress: () => void }) {
     <Animated.View
       style={{
         position: "absolute",
-        right: spacing.lg,
-        bottom: spacing.xxl,
+        right: 24,
+        bottom: insets.bottom + 80,
         transform: [{ scale: pulse }],
         ...shadows.lg,
         shadowColor: colors.primary,
