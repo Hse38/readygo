@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { I18n } from "i18n-js";
-import { getLocales } from "expo-localization";
 import { useEffect, useState } from "react";
 
 import { translations } from "../constants/translations";
@@ -8,15 +7,17 @@ import { translations } from "../constants/translations";
 type AppLocale = "tr" | "en";
 
 const STORAGE_KEY = "readygo_language";
+const DEFAULT_LOCALE: AppLocale = "tr";
+
 const i18n = new I18n(translations);
 i18n.enableFallback = true;
-i18n.defaultLocale = "en";
+i18n.defaultLocale = DEFAULT_LOCALE;
+i18n.locale = DEFAULT_LOCALE;
 
 const listeners = new Set<(locale: AppLocale) => void>();
 
-function detectDeviceLocale(): AppLocale {
-  const localeTag = getLocales()[0]?.languageCode?.toLowerCase();
-  return localeTag === "tr" ? "tr" : "en";
+function isAppLocale(value: string | null): value is AppLocale {
+  return value === "tr" || value === "en";
 }
 
 function notify(locale: AppLocale) {
@@ -24,8 +25,8 @@ function notify(locale: AppLocale) {
 }
 
 export async function initI18n(): Promise<void> {
-  const saved = (await AsyncStorage.getItem(STORAGE_KEY)) as AppLocale | null;
-  const locale = saved ?? detectDeviceLocale();
+  const saved = await AsyncStorage.getItem(STORAGE_KEY);
+  const locale = isAppLocale(saved) ? saved : DEFAULT_LOCALE;
   i18n.locale = locale;
   notify(locale);
 }
