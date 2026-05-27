@@ -1,7 +1,7 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { IconCalendar, IconClock, IconMapPin, IconRoute } from "@tabler/icons-react-native";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Animated,
@@ -29,20 +29,43 @@ import {
 } from "../lib/notifications";
 import { getToken, getUser } from "../lib/storage";
 
-const EVENT_TYPES = [
-  { value: "flight", emoji: "✈️", label: "Uçuş", color: "#EEF2FF" },
-  { value: "exam", emoji: "📝", label: "Sınav", color: "#F0FDF4" },
-  { value: "wedding", emoji: "💍", label: "Düğün", color: "#FDF4FF" },
-  { value: "doctor", emoji: "🏥", label: "Doktor", color: "#FFF1F2" },
-  { value: "meeting", emoji: "👔", label: "Toplantı", color: "#FFFBEB" },
-  { value: "concert", emoji: "🎵", label: "Konser", color: "#F0F9FF" },
-  { value: "travel", emoji: "🧳", label: "Seyahat", color: "#FFF7ED" },
-  { value: "sport", emoji: "🏋️", label: "Spor", color: "#F0FDF4" },
-  { value: "birthday", emoji: "🎂", label: "Doğum", color: "#FDF4FF" },
-  { value: "ceremony", emoji: "🎓", label: "Tören", color: "#FFFBEB" },
-  { value: "legal", emoji: "⚖️", label: "Resmi", color: "#F8FAFC" },
-  { value: "other", emoji: "📌", label: "Diğer", color: "#F8F8F8" },
-] as const;
+type EventType =
+  | "flight"
+  | "exam"
+  | "wedding"
+  | "doctor"
+  | "meeting"
+  | "concert"
+  | "travel"
+  | "sport"
+  | "birthday"
+  | "ceremony"
+  | "legal"
+  | "other";
+
+type EventTypeConfig = {
+  value: EventType;
+  emoji: string;
+  label: string;
+  color: string;
+};
+
+const TYPE_CONFIG: Record<EventType, EventTypeConfig> = {
+  flight: { value: "flight", emoji: "✈️", label: "Uçuş", color: "#EEF2FF" },
+  exam: { value: "exam", emoji: "📝", label: "Sınav", color: "#F0FDF4" },
+  wedding: { value: "wedding", emoji: "💍", label: "Düğün", color: "#FDF4FF" },
+  doctor: { value: "doctor", emoji: "🏥", label: "Doktor", color: "#FFF1F2" },
+  meeting: { value: "meeting", emoji: "👔", label: "Toplantı", color: "#FFFBEB" },
+  concert: { value: "concert", emoji: "🎵", label: "Konser", color: "#F0F9FF" },
+  travel: { value: "travel", emoji: "🧳", label: "Seyahat", color: "#FFF7ED" },
+  sport: { value: "sport", emoji: "🏋️", label: "Spor", color: "#F0FDF4" },
+  birthday: { value: "birthday", emoji: "🎂", label: "Doğum Günü", color: "#FDF4FF" },
+  ceremony: { value: "ceremony", emoji: "🎓", label: "Tören", color: "#FFFBEB" },
+  legal: { value: "legal", emoji: "⚖️", label: "Resmi İşlem", color: "#F8FAFC" },
+  other: { value: "other", emoji: "📌", label: "Diğer", color: "#F8F8F8" },
+};
+
+const EVENT_TYPES = Object.values(TYPE_CONFIG);
 
 const TRANSPORT_MODES = [
   { icon: "🚶", label: "Yürüyüş", value: "walking" },
@@ -52,7 +75,6 @@ const TRANSPORT_MODES = [
 ] as const;
 
 type TransportMode = (typeof TRANSPORT_MODES)[number]["value"];
-type EventType = (typeof EVENT_TYPES)[number]["value"];
 type FormData = {
   type: EventType | "";
   title: string;
@@ -108,6 +130,7 @@ export default function NewEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  const [selectedEventType, setSelectedEventType] = useState<EventType | null>(null);
   const [form, setForm] = useState<FormData>({
     type: "",
     title: "",
@@ -118,6 +141,8 @@ export default function NewEventScreen() {
     locationLng: null,
     travelMode: "",
   });
+
+  const selectedTypeConfig = selectedEventType ? TYPE_CONFIG[selectedEventType] : null;
 
   useEffect(() => {
     async function loadDefaultTransport() {
@@ -141,8 +166,13 @@ export default function NewEventScreen() {
     setStep(nextStep);
   }
 
+  function selectEventType(type: EventType) {
+    setSelectedEventType(type);
+    updateForm("type", type);
+  }
+
   function validateStep(): boolean {
-    if (step === 1 && !form.type) {
+    if (step === 1 && !selectedEventType) {
       Alert.alert(t("common.missingInfo"), t("newEvent.chooseType"));
       return false;
     }
@@ -154,14 +184,14 @@ export default function NewEventScreen() {
   }
 
   async function handleCreateEvent() {
-    if (!form.type || !form.title.trim()) return;
+    if (!selectedEventType || !form.title.trim()) return;
     setIsSubmitting(true);
     try {
       const token = await getToken();
       if (!token) throw new Error(t("newEvent.noSession"));
       const payload = {
         title: form.title.trim(),
-        type: form.type,
+        type: selectedEventType,
         date: combineDateAndTime(form.eventDate, form.eventTime).toISOString(),
         location: form.location.trim() || undefined,
         locationLat: form.locationLat ?? undefined,
@@ -202,6 +232,7 @@ export default function NewEventScreen() {
       }
       router.replace(`/event/${response.event.id}`);
     } catch (err) {
+      if (err instanceof Error && err.message === "AUTH_SESSION_INVALID") return;
       Alert.alert(t("common.error"), err instanceof Error ? err.message : t("newEvent.createFailed"));
     } finally {
       setIsSubmitting(false);
@@ -209,22 +240,18 @@ export default function NewEventScreen() {
   }
 
   const progress = step / 3;
-  const selectedType = useMemo(
-    () => EVENT_TYPES.find((entry) => entry.value === form.type) ?? EVENT_TYPES[EVENT_TYPES.length - 1],
-    [form.type]
-  );
   const selectedTransport = TRANSPORT_MODES.find((mode) => mode.value === form.travelMode);
   const isBottomButtonDisabled =
     isSubmitting ||
-    (step === 1 && !form.type) ||
+    (step === 1 && !selectedEventType) ||
     (step === 2 && !form.title.trim()) ||
-    (step === 3 && !form.type);
+    (step === 3 && !selectedEventType);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+          <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, flexShrink: 0 }}>
             <Pressable onPress={() => (step === 1 ? router.replace("/(tabs)/home") : animateStepChange(step - 1))}>
               <Text variant="bodySmall" color={colors.textSecondary}>
                 {t("common.back")}
@@ -248,8 +275,9 @@ export default function NewEventScreen() {
 
           <ScrollView
             style={{ flex: 1, paddingHorizontal: spacing.lg }}
-            contentContainerStyle={{ paddingVertical: spacing.lg, paddingBottom: 120 }}
+            contentContainerStyle={{ paddingVertical: spacing.lg, flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             <Animated.View style={{ opacity: fadeAnim }}>
             {step === 1 ? (
@@ -259,11 +287,11 @@ export default function NewEventScreen() {
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
                   {EVENT_TYPES.map((item) => {
-                    const selected = form.type === item.value;
+                    const selected = selectedEventType === item.value;
                     return (
                       <Pressable
                         key={item.value}
-                        onPress={() => updateForm("type", item.value)}
+                        onPress={() => selectEventType(item.value)}
                         style={{
                           width: "31%",
                           borderRadius: radii.lg,
@@ -420,7 +448,7 @@ export default function NewEventScreen() {
               </>
             ) : null}
 
-            {step === 3 ? (
+            {step === 3 && selectedTypeConfig ? (
               <Card
                 style={{
                   backgroundColor: colors.backgroundSecondary,
@@ -434,14 +462,17 @@ export default function NewEventScreen() {
                       width: 80,
                       height: 80,
                       borderRadius: radii.full,
-                      backgroundColor: selectedType.color,
+                      backgroundColor: selectedTypeConfig.color,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 38 }}>{selectedType.emoji}</Text>
+                    <Text style={{ fontSize: 38 }}>{selectedTypeConfig.emoji}</Text>
                   </View>
-                  <Text variant="h1" style={{ marginTop: spacing.md, textAlign: "center" }}>
+                  <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
+                    {selectedTypeConfig.label}
+                  </Text>
+                  <Text variant="h1" style={{ marginTop: spacing.xs, textAlign: "center" }}>
                     {form.title || "Etkinlik"}
                   </Text>
                 </View>
@@ -459,13 +490,12 @@ export default function NewEventScreen() {
 
           <View
             style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
+              flexShrink: 0,
               paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.lg,
               paddingTop: spacing.sm,
+              paddingBottom: spacing.lg,
+              borderTopWidth: 1,
+              borderTopColor: colors.borderLight,
               backgroundColor: colors.background,
             }}
           >

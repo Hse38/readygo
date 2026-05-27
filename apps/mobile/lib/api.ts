@@ -1,5 +1,6 @@
+import { router } from "expo-router";
+
 import { API_URL } from "../constants/config";
-import { Linking } from "react-native";
 import { clearAll } from "./storage";
 
 function isUserNotFoundMessage(body: unknown): boolean {
@@ -12,6 +13,14 @@ function isUserNotFoundMessage(body: unknown): boolean {
         : "";
 
   return typeof errorMessage === "string" && errorMessage.toLowerCase().includes("user not found");
+}
+
+async function handleInvalidSession(): Promise<void> {
+  await clearAll();
+  if (router.canDismiss?.()) {
+    router.dismissAll();
+  }
+  router.replace("/onboarding");
 }
 
 export async function apiFetch<T = unknown>(
@@ -36,8 +45,7 @@ export async function apiFetch<T = unknown>(
   const body = await response.json().catch(() => null);
 
   if (response.status === 401 || isUserNotFoundMessage(body)) {
-    await clearAll();
-    await Linking.openURL("readygo:///onboarding").catch(() => undefined);
+    await handleInvalidSession();
     throw new Error("AUTH_SESSION_INVALID");
   }
 
