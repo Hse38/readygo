@@ -2,10 +2,12 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
+import { useTheme } from "../hooks/useTheme";
 import { apiFetch } from "../lib/api";
 import { getToken, getUser } from "../lib/storage";
 
 export default function Index() {
+  const { colors } = useTheme();
   const [href, setHref] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,8 +40,15 @@ export default function Index() {
 
   if (!href) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" />
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

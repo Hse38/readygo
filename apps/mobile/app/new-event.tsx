@@ -22,6 +22,7 @@ import type { ChecklistItem, Event, User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
 import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
+import { getTintedSurface } from "../lib/themeSurfaces";
 import {
   requestPermissions,
   scheduleChecklistNotifications,
@@ -122,7 +123,7 @@ function formatTime(date: Date): string {
 
 export default function NewEventScreen() {
   const router = useRouter();
-  const { colors, spacing, radii, shadows } = useTheme();
+  const { colors, spacing, radii, shadows, isDark } = useTheme();
   const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -308,14 +309,18 @@ export default function NewEventScreen() {
                             width: 64,
                             height: 64,
                             borderRadius: radii.lg,
-                            backgroundColor: item.color,
+                            backgroundColor: getTintedSurface(item.color, isDark, colors),
                             alignItems: "center",
                             justifyContent: "center",
                           }}
                         >
                           <Text style={{ fontSize: 30 }}>{item.emoji}</Text>
                         </View>
-                        <Text variant="caption" style={{ marginTop: spacing.sm, textAlign: "center" }}>
+                        <Text
+                          variant="caption"
+                          color={colors.text}
+                          style={{ marginTop: spacing.sm, textAlign: "center" }}
+                        >
                           {item.label}
                         </Text>
                       </Pressable>
@@ -451,8 +456,8 @@ export default function NewEventScreen() {
             {step === 3 && selectedTypeConfig ? (
               <Card
                 style={{
-                  backgroundColor: colors.backgroundSecondary,
-                  borderColor: colors.borderLight,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
                   ...shadows.sm,
                 }}
               >
@@ -462,7 +467,7 @@ export default function NewEventScreen() {
                       width: 80,
                       height: 80,
                       borderRadius: radii.full,
-                      backgroundColor: selectedTypeConfig.color,
+                      backgroundColor: getTintedSurface(selectedTypeConfig.color, isDark, colors),
                       alignItems: "center",
                       justifyContent: "center",
                     }}

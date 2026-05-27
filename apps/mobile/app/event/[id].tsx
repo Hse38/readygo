@@ -484,7 +484,7 @@ export default function EventDetailScreen() {
       </ScrollView>
 
       <Modal visible={isParticipantsModalVisible} transparent animationType="slide" onRequestClose={() => setParticipantsModalVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
+        <View style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" }}>
           <View
             style={{
               backgroundColor: colors.background,

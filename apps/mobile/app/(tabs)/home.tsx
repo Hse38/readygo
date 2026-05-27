@@ -30,6 +30,7 @@ import type { ChecklistItem, Event, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
 import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
+import { getTintedSurface } from "../../lib/themeSurfaces";
 import { clearAll, getToken, getUser } from "../../lib/storage";
 
 type EventsResponse = { events: Event[] };
@@ -117,8 +118,16 @@ function getDaysRemainingLabel(dateStr: string, t: (key: string) => string): str
   return `${diffDays} gün`;
 }
 
-function getEventTypeStyle(type: string): EventTypeStyle {
-  return EVENT_TYPE_STYLES[type.toLowerCase()] ?? DEFAULT_EVENT_STYLE;
+function getEventTypeStyle(
+  type: string,
+  isDark: boolean,
+  colors: { surfaceElevated: string; backgroundTertiary: string; surface: string }
+): EventTypeStyle {
+  const base = EVENT_TYPE_STYLES[type.toLowerCase()] ?? DEFAULT_EVENT_STYLE;
+  return {
+    ...base,
+    backgroundColor: getTintedSurface(base.backgroundColor, isDark, colors),
+  };
 }
 
 function getInitials(user: User | null): string {
@@ -147,7 +156,7 @@ function isSessionInvalidError(error: unknown): boolean {
 export default function HomeScreen() {
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date?: string }>();
-  const { colors, spacing, radii, shadows } = useTheme();
+  const { colors, spacing, radii, shadows, isDark } = useTheme();
   const { t } = useTranslation();
   const [events, setEvents] = useState<Event[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -368,7 +377,7 @@ export default function HomeScreen() {
             const bgColor = isToday
               ? colors.primary
               : isSelected
-                ? colors.primaryLight
+                ? colors.primary
                 : colors.backgroundSecondary;
             const txtColor = isToday || isSelected ? colors.white : colors.text;
             const dayIndex = item.getDay() === 0 ? 6 : item.getDay() - 1;
@@ -397,7 +406,7 @@ export default function HomeScreen() {
                         height: 5,
                         width: 5,
                         borderRadius: radii.full,
-                        backgroundColor: getEventTypeStyle(event.type).dotColor,
+                        backgroundColor: getEventTypeStyle(event.type, isDark, colors).dotColor,
                       }}
                     />
                   ))}
@@ -428,18 +437,26 @@ export default function HomeScreen() {
                 width: 108,
                 height: 108,
                 borderRadius: 24,
-                backgroundColor: "#F3F0FF",
+                backgroundColor: colors.backgroundTertiary,
                 borderWidth: 2,
-                borderColor: "#D7CEFF",
+                borderColor: colors.border,
                 padding: 14,
               }}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#7C6FF7" }} />
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#7C6FF7" }} />
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
               </View>
-              <View style={{ flex: 1, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ color: "#7C6FF7", fontSize: 28, fontFamily: "Inter_700Bold" }}>+</Text>
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: 12,
+                  backgroundColor: colors.surface,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 28, fontFamily: "Inter_700Bold" }}>+</Text>
               </View>
             </View>
             <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.md }}>
@@ -448,7 +465,7 @@ export default function HomeScreen() {
           </View>
         ) : (
           selectedDayEvents.map((event) => {
-            const { backgroundColor, Icon } = getEventTypeStyle(event.type);
+            const { backgroundColor, Icon } = getEventTypeStyle(event.type, isDark, colors);
             const showChecklist = nearestEvent?.id === event.id;
             return (
               <View key={event.id} style={{ marginBottom: spacing.md }}>
@@ -474,7 +491,7 @@ export default function HomeScreen() {
                       backgroundColor,
                     }}
                   >
-                    <Icon size={22} color="#4B5563" strokeWidth={1.75} />
+                    <Icon size={22} color={colors.textSecondary} strokeWidth={1.75} />
                   </View>
                   <View style={{ flex: 1, paddingRight: spacing.sm }}>
                     <Text variant="h3" style={{ fontSize: 17 }}>

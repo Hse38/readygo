@@ -16,11 +16,11 @@ export function Badge({ label, variant = "neutral", size = "md" }: Props) {
   const { colors, radii, spacing } = useTheme();
 
   const palette: Record<BadgeVariant, { bg: string; text: string }> = {
-    primary: { bg: colors.primaryLight, text: colors.white },
+    primary: { bg: colors.primary, text: colors.white },
     success: { bg: colors.success, text: colors.white },
     warning: { bg: colors.warning, text: colors.white },
     error: { bg: colors.error, text: colors.white },
-    neutral: { bg: colors.backgroundTertiary, text: colors.textSecondary },
+    neutral: { bg: colors.backgroundTertiary, text: colors.text },
   };
 
   const sizeStyle = size === "sm"

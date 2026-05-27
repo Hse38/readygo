@@ -47,7 +47,7 @@ function isGoogleAuthConfigured(): boolean {
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { colors, spacing, radii, shadows } = useTheme();
+  const { colors, spacing, radii, shadows, isDark } = useTheme();
   const { t } = useTranslation();
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -217,9 +217,24 @@ export default function AuthScreen() {
           </Text>
 
           {isAppleAvailable && Platform.OS === "ios" ? (
-            <Button onPress={handleAppleSignIn} disabled={isLoading} size="lg" style={{ backgroundColor: "#000000", borderRadius: radii.xl }}>
-              {` ${t("auth.apple")}`}
-            </Button>
+            <Pressable
+              onPress={handleAppleSignIn}
+              disabled={isLoading}
+              style={{
+                minHeight: 52,
+                borderRadius: radii.xl,
+                backgroundColor: isDark ? colors.surfaceElevated : colors.text,
+                borderWidth: isDark ? 1 : 0,
+                borderColor: colors.border,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: isLoading ? 0.5 : 1,
+              }}
+            >
+              <Text variant="label" color={isDark ? colors.text : colors.white}>
+                {` ${t("auth.apple")}`}
+              </Text>
+            </Pressable>
           ) : null}
 
           <View style={{ alignItems: "center", marginVertical: spacing.md }}>

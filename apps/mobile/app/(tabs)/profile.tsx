@@ -324,27 +324,33 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
-          <Card style={{ flex: 1, alignItems: "center" }}>
-            <Text variant="h2">{String(eventCount)}</Text>
+          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
+            <Text variant="h2" color={colors.text}>
+              {String(eventCount)}
+            </Text>
             <Text variant="caption" color={colors.textSecondary}>
               {t("profile.events")}
             </Text>
           </Card>
-          <Card style={{ flex: 1, alignItems: "center" }}>
-            <Text variant="h2">{String(completedTasks)}</Text>
+          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
+            <Text variant="h2" color={colors.text}>
+              {String(completedTasks)}
+            </Text>
             <Text variant="caption" color={colors.textSecondary}>
               {t("profile.completed")}
             </Text>
           </Card>
-          <Card style={{ flex: 1, alignItems: "center" }}>
-            <Text variant="h2">{String(upcomingEvents)}</Text>
+          <Card style={{ flex: 1, alignItems: "center", backgroundColor: colors.surface }}>
+            <Text variant="h2" color={colors.text}>
+              {String(upcomingEvents)}
+            </Text>
             <Text variant="caption" color={colors.textSecondary}>
               {t("profile.upcoming")}
             </Text>
           </Card>
         </View>
 
-        <Card style={{ marginBottom: spacing.md }}>
+        <Card style={{ marginBottom: spacing.md, backgroundColor: colors.surface }}>
           <InfoRow label={t("profile.occupation")} value={user?.occupation} />
           <InfoRow label={t("profile.workLocation")} value={user?.workLocation} />
           <InfoRow label={t("profile.homeLocation")} value={user?.homeLocation} />
@@ -358,7 +364,7 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        <Card style={{ marginBottom: spacing.md }}>
+        <Card style={{ marginBottom: spacing.md, backgroundColor: colors.surface }}>
           <SettingRow label="Dil / Language">
             <View style={{ flexDirection: "row", gap: spacing.xs }}>
               <Pressable
@@ -410,7 +416,12 @@ export default function ProfileScreen() {
           </SettingRow>
         </Card>
 
-        <Button size="lg" onPress={() => setIsEditOpen(true)} style={{ marginBottom: spacing.md }}>
+        <Button
+          variant="secondary"
+          size="lg"
+          onPress={() => setIsEditOpen(true)}
+          style={{ marginBottom: spacing.md, borderRadius: radii.xl }}
+        >
           Profili Düzenle
         </Button>
 
@@ -418,7 +429,7 @@ export default function ProfileScreen() {
           variant="danger"
           size="lg"
           onPress={handleLogout}
-          style={{ marginTop: spacing.md, marginBottom: spacing.md }}
+          style={{ marginTop: spacing.sm, marginBottom: spacing.md, borderRadius: radii.xl }}
         >
           Çıkış Yap
         </Button>
@@ -547,10 +558,10 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ marginBottom: spacing.sm }}>
-      <Text variant="caption" color={colors.textTertiary}>
+      <Text variant="caption" color={colors.textSecondary}>
         {label}
       </Text>
-      <Text variant="body" style={{ flexWrap: "wrap" }}>
+      <Text variant="body" color={colors.text} style={{ flexWrap: "wrap" }}>
         {value || "-"}
       </Text>
     </View>
@@ -564,7 +575,7 @@ function SettingRow({
   label: string;
   children: ReactNode;
 }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   return (
     <View
       style={{
@@ -574,7 +585,9 @@ function SettingRow({
         marginBottom: spacing.sm,
       }}
     >
-      <Text variant="body">{label}</Text>
+      <Text variant="body" color={colors.text}>
+        {label}
+      </Text>
       {children}
     </View>
   );

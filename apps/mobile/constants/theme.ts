@@ -17,6 +17,7 @@ export const Colors = {
     warning: "#F59E0B",
     error: "#EF4444",
     white: "#FFFFFF",
+    overlay: "rgba(0, 0, 0, 0.35)",
   },
   dark: {
     primary: "#9B94F8",
@@ -36,6 +37,7 @@ export const Colors = {
     warning: "#F59E0B",
     error: "#EF4444",
     white: "#FFFFFF",
+    overlay: "rgba(0, 0, 0, 0.65)",
   },
 };
 

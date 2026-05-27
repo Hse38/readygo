@@ -104,20 +104,24 @@ export default function InviteScreen() {
         <Text variant="label" color={colors.textSecondary}>
           Etkinlik
         </Text>
-        <Text variant="h3" style={{ marginTop: spacing.xs }}>
+        <Text variant="h3" color={colors.text} style={{ marginTop: spacing.xs }}>
           {invite.event.title}
         </Text>
         <Text variant="bodySmall" color={colors.textSecondary}>
           {new Date(invite.event.date).toLocaleString("tr-TR")}
         </Text>
-        {invite.event.location ? <Text variant="bodySmall">{invite.event.location}</Text> : null}
+        {invite.event.location ? (
+          <Text variant="bodySmall" color={colors.text}>
+            {invite.event.location}
+          </Text>
+        ) : null}
       </Card>
 
       <Card style={{ marginBottom: spacing.xl }}>
         <Text variant="label" color={colors.textSecondary}>
           Katilimci
         </Text>
-        <Text variant="body" style={{ marginTop: spacing.xs }}>
+        <Text variant="body" color={colors.text} style={{ marginTop: spacing.xs }}>
           {invite.participant.name || "-"}
         </Text>
         <Text variant="bodySmall" color={colors.textSecondary}>

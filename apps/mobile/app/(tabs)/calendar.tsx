@@ -101,7 +101,7 @@ export default function CalendarScreen() {
           <Pressable onPress={() => moveMonth("prev")} hitSlop={10}>
             <IconChevronLeft size={20} color={colors.textSecondary} />
           </Pressable>
-          <Text variant="h3">
+          <Text variant="h3" color={colors.text}>
             {MONTHS_TR[monthDate.getMonth()]} {monthDate.getFullYear()}
           </Text>
           <Pressable onPress={() => moveMonth("next")} hitSlop={10}>
@@ -134,7 +134,7 @@ export default function CalendarScreen() {
                       alignItems: "center",
                       paddingVertical: spacing.sm,
                       borderRadius: radii.md,
-                      backgroundColor: isToday ? colors.primaryLight : "transparent",
+                      backgroundColor: isToday ? colors.primary : "transparent",
                     }}
                     onPress={() =>
                       router.push({

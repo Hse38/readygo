@@ -282,7 +282,11 @@ export default function OnboardingScreen() {
                         }}
                       >
                         <Text style={{ fontSize: 24 }}>{mode.icon}</Text>
-                        <Text variant="bodySmall" style={{ marginTop: spacing.xs }}>
+                        <Text
+                          variant="bodySmall"
+                          color={selected ? colors.text : colors.textSecondary}
+                          style={{ marginTop: spacing.xs }}
+                        >
                           {t(`onboarding.transportModes.${mode.value}`)}
                         </Text>
                       </Pressable>
@@ -380,10 +384,12 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ marginBottom: spacing.sm }}>
-      <Text variant="caption" color={colors.textTertiary}>
+      <Text variant="caption" color={colors.textSecondary}>
         {label}
       </Text>
-      <Text variant="body">{value || "-"}</Text>
+      <Text variant="body" color={colors.text}>
+        {value || "-"}
+      </Text>
     </View>
   );
 }
