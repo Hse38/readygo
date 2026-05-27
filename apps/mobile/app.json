@@ -35,7 +35,8 @@
       "expo-apple-authentication",
       "@react-native-community/datetimepicker",
       "@react-native-google-signin/google-signin",
-      "expo-font"
+      "expo-font",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

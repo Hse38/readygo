@@ -2,7 +2,9 @@ import {
   IconClock,
   IconMapPin,
   IconSparkles,
+  IconUserPlus,
 } from "@tabler/icons-react-native";
+import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -10,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -20,9 +23,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { Input } from "../../components/ui/Input";
 import { Text } from "../../components/ui/Text";
-import type { ChecklistItem, Event, User } from "../../constants/types";
+import type { ChecklistItem, Event, Participant, User } from "../../constants/types";
 import { useTheme } from "../../hooks/useTheme";
+import { useTranslation } from "../../lib/i18n";
 import { apiFetch } from "../../lib/api";
 import { getToken, getUser } from "../../lib/storage";
 
@@ -48,21 +53,6 @@ const TRANSPORT_LABELS: Record<string, string> = {
   cycling: "Bisiklet",
 };
 
-const TURKISH_MONTHS = [
-  "Ocak",
-  "Subat",
-  "Mart",
-  "Nisan",
-  "Mayis",
-  "Haziran",
-  "Temmuz",
-  "Agustos",
-  "Eylul",
-  "Ekim",
-  "Kasim",
-  "Aralik",
-];
-
 type EventDetailResponse = { event: Event };
 type TravelStep = {
   type: "transit" | "walking";
@@ -77,21 +67,39 @@ type TravelTimeResponse = {
   departureTime: string;
   transitDetails?: { firstDeparture: string; steps: TravelStep[] };
 };
+type EventParticipantsResponse = {
+  participants: Participant[];
+};
+type AddParticipantResponse = {
+  participant: Participant;
+  inviteLink: string;
+};
 
 function isUser(value: object | null): value is User {
   return !!value && typeof value === "object" && "name" in value;
 }
 
-function formatEventDateTime(dateStr: string): string {
+function formatEventDateTime(dateStr: string, locale: "tr" | "en"): string {
   const date = new Date(dateStr);
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]} ${date.getFullYear()}, ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
-function formatScheduledAt(dateStr?: string): string | null {
+function formatScheduledAt(dateStr: string | undefined, locale: "tr" | "en"): string | null {
   if (!dateStr) return null;
   const date = new Date(dateStr);
   if (Number.isNaN(date.getTime())) return null;
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]}, ${date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`;
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function coordinatePair(lat?: number, lng?: number): string | null {
@@ -103,6 +111,7 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { t, locale } = useTranslation();
   const eventId = typeof id === "string" ? id : id?.[0];
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -111,6 +120,12 @@ export default function EventDetailScreen() {
   const [isLoadingTravel, setIsLoadingTravel] = useState(true);
   const [travelInfo, setTravelInfo] = useState<TravelTimeResponse | null>(null);
   const [travelError, setTravelError] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isParticipantsModalVisible, setParticipantsModalVisible] = useState(false);
+  const [isAddingParticipant, setIsAddingParticipant] = useState(false);
+  const [participantEmail, setParticipantEmail] = useState("");
+  const [participantName, setParticipantName] = useState("");
+  const [generatedInviteLink, setGeneratedInviteLink] = useState<string | null>(null);
 
   const sortedChecklist = useMemo(() => {
     const items = event?.checklistItems ?? [];
@@ -135,7 +150,7 @@ export default function EventDetailScreen() {
     const destination = coordinatePair(eventData.locationLat, eventData.locationLng) ?? eventData.location?.trim();
     const mode = eventData.travelMode ?? user?.transportMode ?? "driving";
     if (!origin || !destination) {
-      setTravelError("Konum bilgisi eksik");
+      setTravelError(t("eventDetail.missingLocation"));
       setIsLoadingTravel(false);
       return;
     }
@@ -150,7 +165,7 @@ export default function EventDetailScreen() {
       setTravelInfo(response);
     } catch {
       setTravelInfo(null);
-      setTravelError("Yol suresi alinamadi");
+      setTravelError(t("eventDetail.travelFailed"));
     } finally {
       setIsLoadingTravel(false);
     }
@@ -168,6 +183,22 @@ export default function EventDetailScreen() {
   useEffect(() => {
     if (event) void loadTravelTime(event, storedUser);
   }, [event, storedUser, loadTravelTime]);
+
+  const loadParticipants = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const response = await apiFetch<EventParticipantsResponse>(`/events/${eventId}/participants`, {}, token);
+      setParticipants(response.participants);
+    } catch {
+      // ignore participant load errors in detail page
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    void loadParticipants();
+  }, [loadParticipants]);
 
   async function handleToggleChecklistItem(item: ChecklistItem) {
     if (!event) return;
@@ -201,7 +232,7 @@ export default function EventDetailScreen() {
     const originCoords = coordinatePair(storedUser?.homeLocationLat, storedUser?.homeLocationLng);
     const destinationCoords = coordinatePair(event.locationLat, event.locationLng);
     if (!originCoords || !destinationCoords) {
-      Alert.alert("Eksik konum", "Navigasyon icin koordinat bilgisi gerekiyor.");
+      Alert.alert(t("common.error"), t("eventDetail.routeError"));
       return;
     }
     const [toLat, toLng] = destinationCoords.split(",");
@@ -214,7 +245,7 @@ export default function EventDetailScreen() {
     const openUrl = async (url: string) => {
       const supported = await Linking.canOpenURL(url);
       if (!supported) {
-        Alert.alert("Acilamadi", "Uygulama cihazda bulunamadi.");
+      Alert.alert(t("common.error"), t("eventDetail.appMissing"));
         return;
       }
       await Linking.openURL(url);
@@ -222,7 +253,10 @@ export default function EventDetailScreen() {
 
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ["Vazgec", "Google Maps", "Yandex Navigasyon", "Apple Haritalar"], cancelButtonIndex: 0 },
+        {
+          options: [t("common.cancel"), t("eventDetail.googleMaps"), t("eventDetail.yandex"), t("eventDetail.appleMaps")],
+          cancelButtonIndex: 0,
+        },
         (index) => {
           if (index === 1) void openUrl(urls.google);
           if (index === 2) void openUrl(urls.yandex);
@@ -230,12 +264,64 @@ export default function EventDetailScreen() {
         }
       );
     } else {
-      Alert.alert("Yol Tarifi Al", "Uygulama secin", [
-        { text: "Google Maps", onPress: () => void openUrl(urls.google) },
-        { text: "Yandex Navigasyon", onPress: () => void openUrl(urls.yandex) },
-        { text: "Iptal", style: "cancel" },
+      Alert.alert(t("eventDetail.route"), t("eventDetail.routeSelect"), [
+        { text: t("eventDetail.googleMaps"), onPress: () => void openUrl(urls.google) },
+        { text: t("eventDetail.yandex"), onPress: () => void openUrl(urls.yandex) },
+        { text: t("common.cancel"), style: "cancel" },
       ]);
     }
+  }
+
+  async function handleAddParticipant() {
+    if (!eventId || !participantEmail.trim()) {
+      Alert.alert(t("common.error"), "Email gerekli.");
+      return;
+    }
+
+    try {
+      setIsAddingParticipant(true);
+      const token = await getToken();
+      if (!token) return;
+      const response = await apiFetch<AddParticipantResponse>(
+        `/events/${eventId}/participants`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email: participantEmail.trim(),
+            name: participantName.trim() || undefined,
+          }),
+        },
+        token
+      );
+      setGeneratedInviteLink(response.inviteLink);
+      setParticipantEmail("");
+      setParticipantName("");
+      await loadParticipants();
+    } catch (error) {
+      Alert.alert(t("common.error"), error instanceof Error ? error.message : "Davet gonderilemedi.");
+    } finally {
+      setIsAddingParticipant(false);
+    }
+  }
+
+  function getStatusColor(status: Participant["status"]): string {
+    if (status === "accepted") return colors.success;
+    if (status === "declined") return colors.danger;
+    return colors.warning;
+  }
+
+  function getInitials(participant: Participant): string {
+    const text =
+      participant.name ||
+      participant.user?.name ||
+      participant.user?.email ||
+      participant.email;
+    return text
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((chunk) => chunk[0]?.toUpperCase() ?? "")
+      .join("");
   }
 
   const typeMeta = event ? EVENT_TYPES[event.type.toLowerCase()] ?? EVENT_TYPES.other : EVENT_TYPES.other;
@@ -249,8 +335,8 @@ export default function EventDetailScreen() {
             <Text variant="h3" color={colors.primary}>←</Text>
           </Pressable>
           <Text style={{ fontSize: 30, marginRight: spacing.sm }}>{typeMeta.emoji}</Text>
-          <Text variant="h2" style={{ flex: 1 }}>
-            {event?.title ?? "Etkinlik"}
+            <Text variant="h2" style={{ flex: 1 }}>
+            {event?.title ?? t("profile.events")}
           </Text>
         </View>
 
@@ -263,7 +349,7 @@ export default function EventDetailScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.lg }}>
               <IconClock size={16} color={colors.textSecondary} />
               <Text variant="body" color={colors.textSecondary} style={{ marginLeft: spacing.xs }}>
-                {formatEventDateTime(event.date)}
+                {formatEventDateTime(event.date, locale)}
               </Text>
             </View>
 
@@ -272,7 +358,7 @@ export default function EventDetailScreen() {
                 <ActivityIndicator color={colors.primary} />
               ) : travelInfo ? (
                 <>
-                  <Text variant="label" color={colors.textSecondary}>Evden cik</Text>
+                  <Text variant="label" color={colors.textSecondary}>{t("eventDetail.leaveHome")}</Text>
                   <Text variant="h1" style={{ marginTop: spacing.xs }}>
                     {new Date(travelInfo.departureTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                   </Text>
@@ -304,18 +390,18 @@ export default function EventDetailScreen() {
                   ) : null}
 
                   <Button onPress={() => void openDirections(travelMode)} variant="secondary" style={{ marginTop: spacing.md }}>
-                    Yol Tarifi Al
+                    {t("eventDetail.route")}
                   </Button>
                 </>
               ) : (
                 <Text variant="bodySmall" color={colors.textSecondary}>
-                  {travelError ?? "Yol bilgisi yok"}
+                  {travelError ?? t("eventDetail.travelUnavailable")}
                 </Text>
               )}
             </Card>
 
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
-              <Text variant="h3">Yapilacaklar</Text>
+              <Text variant="h3">{t("eventDetail.checklist")}</Text>
               <IconSparkles size={18} color={colors.primary} style={{ marginLeft: spacing.xs }} />
             </View>
             <Card>
@@ -348,18 +434,115 @@ export default function EventDetailScreen() {
                     >
                       {item.title}
                     </Text>
-                    {formatScheduledAt(item.scheduledAt) ? (
+                    {formatScheduledAt(item.scheduledAt, locale) ? (
                       <Text variant="caption" color={colors.textTertiary}>
-                        {formatScheduledAt(item.scheduledAt)}
+                        {formatScheduledAt(item.scheduledAt, locale)}
                       </Text>
                     ) : null}
                   </View>
                 </Pressable>
               ))}
             </Card>
+
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm }}>
+              <Text variant="h3">Katilimcilar</Text>
+              <IconUserPlus size={18} color={colors.primary} style={{ marginLeft: spacing.xs }} />
+            </View>
+            <Card>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.md }}>
+                {participants.slice(0, 5).map((participant) => (
+                  <View
+                    key={participant.id}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: radii.full,
+                      backgroundColor: colors.backgroundTertiary,
+                      borderWidth: 2,
+                      borderColor: getStatusColor(participant.status),
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: spacing.xs,
+                    }}
+                  >
+                    <Text variant="caption">{getInitials(participant)}</Text>
+                  </View>
+                ))}
+                {participants.length > 5 ? (
+                  <Text variant="bodySmall" color={colors.textSecondary}>
+                    +{participants.length - 5} more
+                  </Text>
+                ) : null}
+              </View>
+
+              <Button variant="secondary" onPress={() => setParticipantsModalVisible(true)}>
+                Kisi Ekle +
+              </Button>
+            </Card>
           </>
         )}
       </ScrollView>
+
+      <Modal visible={isParticipantsModalVisible} transparent animationType="slide" onRequestClose={() => setParticipantsModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" }}>
+          <View
+            style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: radii.xl,
+              borderTopRightRadius: radii.xl,
+              padding: spacing.xl,
+            }}
+          >
+            <Text variant="h3" style={{ marginBottom: spacing.md }}>
+              Davet Gonder
+            </Text>
+            <Input
+              label="Email"
+              value={participantEmail}
+              onChangeText={setParticipantEmail}
+              placeholder="ornek@email.com"
+            />
+            <Input
+              label="Isim (opsiyonel)"
+              value={participantName}
+              onChangeText={setParticipantName}
+              placeholder="Ahmet"
+            />
+            <Button onPress={handleAddParticipant} loading={isAddingParticipant}>
+              Davet Gonder
+            </Button>
+            {generatedInviteLink ? (
+              <Card style={{ marginTop: spacing.md }}>
+                <Text variant="caption" color={colors.textSecondary}>
+                  Davet Linki
+                </Text>
+                <Text variant="bodySmall" style={{ marginVertical: spacing.xs }}>
+                  {generatedInviteLink}
+                </Text>
+                <Button
+                  variant="ghost"
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(generatedInviteLink);
+                    Alert.alert("Kopyalandi", "Davet linki panoya kopyalandi.");
+                  }}
+                >
+                  Kopyala
+                </Button>
+              </Card>
+            ) : null}
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setParticipantsModalVisible(false);
+                setGeneratedInviteLink(null);
+              }}
+              style={{ marginTop: spacing.sm }}
+            >
+              {t("common.cancel")}
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

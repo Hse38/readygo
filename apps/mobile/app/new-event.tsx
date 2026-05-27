@@ -1,7 +1,7 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { IconCalendar, IconClock, IconMapPin } from "@tabler/icons-react-native";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,7 @@ import { LocationInput } from "../components/ui/LocationInput";
 import { Text } from "../components/ui/Text";
 import type { ChecklistItem, Event, User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
+import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import {
   requestPermissions,
@@ -47,21 +48,6 @@ const TRANSPORT_MODES = [
   { icon: "🚗", label: "Arac", value: "driving" },
   { icon: "🚲", label: "Bisiklet", value: "cycling" },
 ] as const;
-
-const TURKISH_MONTHS = [
-  "Ocak",
-  "Subat",
-  "Mart",
-  "Nisan",
-  "Mayis",
-  "Haziran",
-  "Temmuz",
-  "Agustos",
-  "Eylul",
-  "Ekim",
-  "Kasim",
-  "Aralik",
-];
 
 type TransportMode = (typeof TRANSPORT_MODES)[number]["value"];
 type EventType = (typeof EVENT_TYPES)[number]["value"];
@@ -98,8 +84,12 @@ function combineDateAndTime(date: Date, time: Date): Date {
   return combined;
 }
 
-function formatDate(date: Date): string {
-  return `${date.getDate()} ${TURKISH_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+function formatDate(date: Date, locale: "tr" | "en"): string {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }
 
 function formatTime(date: Date): string {
@@ -109,6 +99,7 @@ function formatTime(date: Date): string {
 export default function NewEventScreen() {
   const router = useRouter();
   const { colors, spacing, radii } = useTheme();
+  const { t, locale } = useTranslation();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -150,11 +141,11 @@ export default function NewEventScreen() {
 
   function validateStep(): boolean {
     if (step === 1 && !form.type) {
-      Alert.alert("Eksik bilgi", "Lutfen etkinlik turu secin.");
+      Alert.alert(t("common.missingInfo"), t("newEvent.chooseType"));
       return false;
     }
     if (step === 2 && !form.title.trim()) {
-      Alert.alert("Eksik bilgi", "Lutfen etkinlik basligini girin.");
+      Alert.alert(t("common.missingInfo"), t("newEvent.chooseTitle"));
       return false;
     }
     return true;
@@ -165,7 +156,7 @@ export default function NewEventScreen() {
     setIsSubmitting(true);
     try {
       const token = await getToken();
-      if (!token) throw new Error("Oturum bulunamadi.");
+      if (!token) throw new Error(t("newEvent.noSession"));
       const payload = {
         title: form.title.trim(),
         type: form.type,
@@ -209,7 +200,10 @@ export default function NewEventScreen() {
       }
       router.replace(`/event/${response.event.id}`);
     } catch (err) {
-      Alert.alert("Hata", err instanceof Error ? err.message : "Etkinlik olusturulamadi.");
+      Alert.alert(
+        t("common.error"),
+        err instanceof Error ? err.message : t("newEvent.createFailed")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +217,7 @@ export default function NewEventScreen() {
         <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
           <Pressable onPress={() => (step === 1 ? router.replace("/(tabs)/home") : animateStepChange(step - 1))}>
             <Text variant="bodySmall" color={colors.textSecondary}>
-              Geri
+              {t("common.back")}
             </Text>
           </Pressable>
           <View
@@ -247,7 +241,7 @@ export default function NewEventScreen() {
             {step === 1 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Etkinlik Turu
+                  {t("newEvent.typeTitle")}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
                   {EVENT_TYPES.map((item) => {
@@ -270,7 +264,7 @@ export default function NewEventScreen() {
                       >
                         <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
                         <Text variant="caption" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                          {item.label}
+                          {t(`newEvent.eventTypes.${item.value}`)}
                         </Text>
                       </Pressable>
                     );
@@ -282,13 +276,13 @@ export default function NewEventScreen() {
             {step === 2 ? (
               <>
                 <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  Etkinlik Detaylari
+                  {t("newEvent.detailTitle")}
                 </Text>
                 <Input
-                  label="Baslik"
+                  label={t("newEvent.title")}
                   value={form.title}
                   onChangeText={(t) => updateForm("title", t)}
-                  placeholder="Kayseri Ucusu"
+                  placeholder={t("newEvent.titlePlaceholder")}
                 />
 
                 <Card style={{ marginBottom: spacing.md }}>
@@ -296,7 +290,7 @@ export default function NewEventScreen() {
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                       <IconCalendar size={18} color={colors.textSecondary} />
                       <Text variant="body" style={{ marginLeft: spacing.sm }}>
-                        {formatDate(form.eventDate)}
+                        {formatDate(form.eventDate, locale)}
                       </Text>
                     </View>
                     <Text variant="bodySmall" color={colors.textTertiary}>›</Text>
@@ -338,9 +332,9 @@ export default function NewEventScreen() {
                 ) : null}
 
                 <LocationInput
-                  label="Konum"
+                  label={t("newEvent.location")}
                   value={form.location}
-                  placeholder="Sabiha Gokcen"
+                  placeholder={t("newEvent.locationPlaceholder")}
                   onLocationSelect={({ address, lat, lng }) => {
                     updateForm("location", address);
                     updateForm("locationLat", address ? lat : null);
@@ -349,7 +343,7 @@ export default function NewEventScreen() {
                 />
 
                 <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  Ulasim Sekli
+                  {t("newEvent.transport")}
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -372,7 +366,7 @@ export default function NewEventScreen() {
                         >
                           <Text>{mode.icon}</Text>
                           <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
-                            {mode.label}
+                            {t(`onboarding.transportModes.${mode.value}`)}
                           </Text>
                         </Pressable>
                       );
@@ -389,12 +383,12 @@ export default function NewEventScreen() {
                     {EVENT_TYPES.find((e) => e.value === form.type)?.emoji ?? "📌"}
                   </Text>
                   <Text variant="h1" style={{ marginTop: spacing.sm, textAlign: "center" }}>
-                    {form.title || "Etkinlik"}
+                    {form.title || t("profile.events")}
                   </Text>
                 </View>
-                <DetailRow icon={<IconCalendar size={16} color={colors.textSecondary} />} label={formatDate(form.eventDate)} />
+                <DetailRow icon={<IconCalendar size={16} color={colors.textSecondary} />} label={formatDate(form.eventDate, locale)} />
                 <DetailRow icon={<IconClock size={16} color={colors.textSecondary} />} label={formatTime(form.eventTime)} />
-                <DetailRow icon={<IconMapPin size={16} color={colors.textSecondary} />} label={form.location || "Belirtilmedi"} />
+                <DetailRow icon={<IconMapPin size={16} color={colors.textSecondary} />} label={form.location || "-"} />
               </Card>
             ) : null}
           </Animated.View>
@@ -403,7 +397,7 @@ export default function NewEventScreen() {
         <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>
           {step === 3 ? (
             <Button onPress={handleCreateEvent} loading={isSubmitting} size="lg" style={{ borderRadius: radii.xl }}>
-              Etkinligi Olustur
+              {t("newEvent.create")}
             </Button>
           ) : (
             <Button
@@ -413,7 +407,7 @@ export default function NewEventScreen() {
               size="lg"
               style={{ borderRadius: radii.xl }}
             >
-              Ileri
+              {t("common.next")}
             </Button>
           )}
         </View>
@@ -422,7 +416,7 @@ export default function NewEventScreen() {
   );
 }
 
-function DetailRow({ icon, label }: { icon: React.ReactNode; label: string }) {
+function DetailRow({ icon, label }: { icon: ReactNode; label: string }) {
   const { spacing } = useTheme();
   return (
     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>

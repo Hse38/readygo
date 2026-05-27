@@ -7,6 +7,7 @@ import checklistRoutes from "./routes/checklist";
 import eventsRoutes from "./routes/events";
 import notificationsRoutes from "./routes/notifications";
 import profileRoutes from "./routes/profile";
+import participantRoutes from "./routes/participants";
 import travelRoutes from "./routes/travel";
 
 const app = express();
@@ -24,6 +25,7 @@ app.use("/events", eventsRoutes);
 app.use("/checklist", checklistRoutes);
 app.use("/profile", profileRoutes);
 app.use("/notifications", notificationsRoutes);
+app.use("/", participantRoutes);
 app.use("/", travelRoutes);
 
 app.use(

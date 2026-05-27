@@ -15,6 +15,7 @@ import {
 } from "../constants/config";
 import type { User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
+import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import { getToken, getUser, saveToken, saveUser } from "../lib/storage";
 
@@ -47,6 +48,7 @@ function isGoogleAuthConfigured(): boolean {
 export default function AuthScreen() {
   const router = useRouter();
   const { colors, spacing, radii, shadows } = useTheme();
+  const { t } = useTranslation();
   const [isAppleAvailable, setIsAppleAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingToken, setIsCheckingToken] = useState(true);
@@ -143,7 +145,10 @@ export default function AuthScreen() {
     } catch (err) {
       const error = err as { code?: string };
       if (error.code !== "ERR_REQUEST_CANCELED") {
-        Alert.alert("Giris basarisiz", err instanceof Error ? err.message : "Apple ile giris olmadi.");
+        Alert.alert(
+          t("auth.loginFailed"),
+          err instanceof Error ? err.message : t("auth.appleFailed")
+        );
       }
     } finally {
       setIsLoading(false);
@@ -166,7 +171,7 @@ export default function AuthScreen() {
     } catch (error: unknown) {
       const err = error as { code?: string };
       if (err.code !== statusCodes.SIGN_IN_CANCELLED && err.code !== statusCodes.IN_PROGRESS) {
-        Alert.alert("Hata", "Google ile giris yapilamadi");
+        Alert.alert(t("common.error"), t("auth.googleFailed"));
       }
     } finally {
       setIsLoading(false);
@@ -192,7 +197,7 @@ export default function AuthScreen() {
             <Text style={{ color: colors.primary, fontSize: 48, fontFamily: "Inter_700Bold" }}>GO</Text>
           </Text>
           <Text variant="body" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
-            Etkinliklerini akillica planla
+            {t("auth.subtitle")}
           </Text>
         </View>
 
@@ -208,28 +213,28 @@ export default function AuthScreen() {
           }}
         >
           <Text variant="h3" style={{ marginBottom: spacing.lg }}>
-            Hesabina giris yap
+            {t("auth.title")}
           </Text>
 
           {isAppleAvailable && Platform.OS === "ios" ? (
             <Button onPress={handleAppleSignIn} disabled={isLoading} size="lg" style={{ backgroundColor: "#000000", borderRadius: radii.xl }}>
-               Apple ile devam et
+              {` ${t("auth.apple")}`}
             </Button>
           ) : null}
 
           <View style={{ alignItems: "center", marginVertical: spacing.md }}>
             <Text variant="caption" color={colors.textTertiary}>
-              veya
+              {t("auth.or")}
             </Text>
           </View>
 
           {isGoogleAuthConfigured() ? (
             <Button onPress={handleGoogleSignIn} disabled={isLoading} variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
-              Google ile devam et
+              {t("auth.google")}
             </Button>
           ) : (
             <Button onPress={() => {}} disabled variant="secondary" size="lg" style={{ borderRadius: radii.xl }}>
-              Google ile devam et · Yakinda
+              {t("auth.googleSoon")}
             </Button>
           )}
 
@@ -237,7 +242,7 @@ export default function AuthScreen() {
 
           <View style={{ marginTop: "auto", flexDirection: "row", justifyContent: "center" }}>
             <Text variant="caption" color={colors.textTertiary}>
-              Gizlilik Politikasi · Kullanim Kosullari
+              {`${t("auth.policy")} · ${t("auth.terms")}`}
             </Text>
           </View>
         </Card>
