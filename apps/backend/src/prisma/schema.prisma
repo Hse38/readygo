@@ -7,6 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum EventType {
+  flight
+  exam
+  wedding
+  meeting
+  doctor
+  concert
+  travel
+  sport
+  birthday
+  ceremony
+  legal
+  other
+}
+
+enum ItemPriority {
+  critical
+  important
+  optional
+}
+
+enum ChecklistItemSource {
+  template
+  ai
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -29,19 +55,24 @@ model User {
 }
 
 model Event {
-  id           String   @id @default(cuid())
-  userId       String
-  title        String
-  type         String
-  date         DateTime
-  location     String?
-  locationLat  Float?
-  locationLng  Float?
-  travelMode   String?
-  createdAt    DateTime @default(now())
+  id                 String    @id @default(cuid())
+  userId             String
+  title              String
+  type               EventType
+  date               DateTime
+  location           String?
+  locationLat        Float?
+  locationLng        Float?
+  travelMode         String?
+  metadata           Json?
+  processedAt        DateTime?
+  intelligenceVersion Int      @default(1)
+  createdAt          DateTime  @default(now())
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   checklistItems ChecklistItem[]
+  timelineItems  TimelineItem[]
+  notificationPlans NotificationPlan[]
   participants   Participant[]
 
   @@index([userId])
@@ -65,11 +96,39 @@ model Participant {
 }
 
 model ChecklistItem {
-  id          String    @id @default(cuid())
+  id          String              @id @default(cuid())
   eventId     String
   title       String
-  isCompleted Boolean   @default(false)
+  isCompleted Boolean             @default(false)
   scheduledAt DateTime?
+  priority    ItemPriority        @default(important)
+  source      ChecklistItemSource @default(template)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model TimelineItem {
+  id          String       @id @default(cuid())
+  eventId     String
+  title       String
+  scheduledAt DateTime
+  type        String
+  priority    ItemPriority @default(important)
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model NotificationPlan {
+  id          String       @id @default(cuid())
+  eventId     String
+  title       String
+  scheduledAt DateTime
+  priority    ItemPriority @default(important)
+  sentAt      DateTime?
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 

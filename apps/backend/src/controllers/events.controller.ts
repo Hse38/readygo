@@ -1,7 +1,8 @@
-import type { ChecklistItem, Event, Prisma } from "@prisma/client";
+import { EventType as PrismaEventType, type ChecklistItem, type Event, type Prisma } from "@prisma/client";
 import type { Request, Response } from "express";
+import { processEvent } from "../core/engine/event.engine";
+import { detectEventType } from "../core/types/event.types";
 import { prisma } from "../lib/prisma";
-import { generateChecklist } from "../services/ai.service";
 import type {
   ChecklistItemResponse,
   CreateEventBody,
@@ -100,6 +101,11 @@ function validateCreateEventBody(body: unknown): CreateEventBody | null {
   };
 }
 
+function toPrismaEventType(value: string): PrismaEventType {
+  const detected = detectEventType(value);
+  return detected as unknown as PrismaEventType;
+}
+
 const eventInclude = {
   checklistItems: {
     orderBy: { scheduledAt: "asc" as const },
@@ -128,11 +134,13 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
 
     const eventDate = new Date(body.date);
 
+    const eventType = toPrismaEventType(body.type);
+
     const event = await prisma.event.create({
       data: {
         userId,
         title: body.title,
-        type: body.type,
+        type: eventType,
         date: eventDate,
         location: body.location ?? null,
         locationLat: body.locationLat ?? null,
@@ -141,18 +149,66 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
       },
     });
 
-    const generatedItems = await generateChecklist(event, user);
+    const intelligence = processEvent({
+      id: event.id,
+      userId: event.userId,
+      title: event.title,
+      type: detectEventType(event.type),
+      date: event.date,
+      location: event.location,
+      locationLat: event.locationLat,
+      locationLng: event.locationLng,
+      travelMode: event.travelMode,
+      metadata: null,
+    });
 
     const checklistItems = await prisma.$transaction(async (tx) => {
-      if (generatedItems.length > 0) {
+      if (intelligence.checklist.length > 0) {
         await tx.checklistItem.createMany({
-          data: generatedItems.map((item) => ({
+          data: intelligence.checklist.map((item) => ({
             eventId: event.id,
             title: item.title,
             scheduledAt: item.scheduledAt,
+            priority: item.priority,
+            source: item.source,
           })),
         });
       }
+
+      if (intelligence.timeline.length > 0) {
+        await tx.timelineItem.createMany({
+          data: intelligence.timeline.map((item) => ({
+            eventId: event.id,
+            title: item.title,
+            scheduledAt: item.scheduledAt,
+            type: item.type,
+            priority: item.priority,
+          })),
+        });
+      }
+
+      if (intelligence.notifications.length > 0) {
+        await tx.notificationPlan.createMany({
+          data: intelligence.notifications.map((item) => ({
+            eventId: event.id,
+            title: item.title,
+            scheduledAt: item.scheduledAt,
+            priority: item.priority,
+          })),
+        });
+      }
+
+      await tx.event.update({
+        where: { id: event.id },
+        data: {
+          processedAt: intelligence.processedAt,
+          intelligenceVersion: intelligence.intelligenceVersion,
+          metadata: {
+            leaveHomeAt: intelligence.leaveHomeAt.toISOString(),
+            eventType: intelligence.eventType,
+          },
+        },
+      });
 
       return tx.checklistItem.findMany({
         where: { eventId: event.id },
