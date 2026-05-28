@@ -8,7 +8,7 @@ import {
   Animated,
   Dimensions,
   Platform,
-  Pressable,
+  TouchableOpacity,
   StyleSheet,
   View,
 } from "react-native";
@@ -355,38 +355,56 @@ export default function AuthScreen() {
           </Text>
         </View>
 
-        <View style={styles.bottomSection}>
-          <Text variant="caption" color={colors.textSecondary} style={styles.signInLabel}>
-            {t("auth.signInPrompt")}
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            paddingHorizontal: 24,
+            paddingBottom: 48,
+            gap: 16,
+          }}
+        >
+          <Text style={{ color: colors.textSecondary, textAlign: "center", fontSize: 14 }}>
+            Devam etmek için giriş yap
           </Text>
 
-          <Pressable
+          <TouchableOpacity
             onPress={handleGoogleSignIn}
             disabled={isLoading || !googleConfigured}
-            style={({ pressed }) => [
-              styles.googleButton,
-              pressed && styles.googleButtonPressed,
-              (!googleConfigured || isLoading) && styles.googleButtonDisabled,
-            ]}
+            style={{
+              width: "100%",
+              height: 54,
+              backgroundColor: "#FFFFFF",
+              borderRadius: 27,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              opacity: isLoading || !googleConfigured ? 0.55 : 1,
+            }}
+            activeOpacity={0.85}
           >
             {isLoading ? (
               <ActivityIndicator color={GOOGLE_BUTTON_TEXT} />
             ) : (
-              <View style={styles.googleButtonContent}>
+              <>
                 <GoogleGIcon size={20} />
-                <Text style={styles.googleButtonText}>Google ile devam et</Text>
-              </View>
+                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 16, color: "#1A1A2E" }}>
+                  Google ile devam et
+                </Text>
+              </>
             )}
-          </Pressable>
+          </TouchableOpacity>
 
-          {!googleConfigured ? (
-            <Text variant="caption" color={colors.textTertiary} style={styles.soonHint}>
-              {t("auth.googleSoon")}
-            </Text>
-          ) : null}
-
-          <Text variant="caption" color={colors.textTertiary} style={styles.legalText}>
-            {`${t("auth.policy")} · ${t("auth.terms")}`}
+          <Text style={{ color: colors.textTertiary, textAlign: "center", fontSize: 11 }}>
+            Gizlilik Politikası · Kullanım Koşulları
           </Text>
         </View>
       </SafeAreaView>
@@ -422,58 +440,5 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: "center",
     fontSize: 16,
-  },
-  bottomSection: {
-    minHeight: "35%",
-    justifyContent: "flex-end",
-    paddingBottom: 8,
-    paddingHorizontal: 24,
-  },
-  signInLabel: {
-    textAlign: "center",
-    marginBottom: 16,
-    fontSize: 13,
-  },
-  googleButton: {
-    alignSelf: "stretch",
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  googleButtonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.98 }],
-  },
-  googleButtonDisabled: {
-    opacity: 0.55,
-  },
-  googleButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: GOOGLE_BUTTON_TEXT,
-  },
-  soonHint: {
-    textAlign: "center",
-    marginTop: 10,
-    fontSize: 11,
-  },
-  legalText: {
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 11,
-    lineHeight: 16,
   },
 });
