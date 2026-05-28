@@ -372,12 +372,10 @@ export default function AuthScreen() {
             {isLoading ? (
               <ActivityIndicator color={GOOGLE_BUTTON_TEXT} />
             ) : (
-              <>
-                <View style={styles.googleIconLeft}>
-                  <GoogleGIcon size={20} />
-                </View>
-                <Text style={styles.googleButtonText}>{t("auth.google")}</Text>
-              </>
+              <View style={styles.googleButtonContent}>
+                <GoogleGIcon size={20} />
+                <Text style={styles.googleButtonText}>Google ile devam et</Text>
+              </View>
             )}
           </Pressable>
 
@@ -456,20 +454,16 @@ const styles = StyleSheet.create({
   googleButtonDisabled: {
     opacity: 0.55,
   },
-  googleIconLeft: {
-    position: "absolute",
-    left: 20,
-    top: 0,
-    bottom: 0,
+  googleButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 12,
   },
   googleButtonText: {
-    width: "100%",
-    textAlign: "center",
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: GOOGLE_BUTTON_TEXT,
-    paddingHorizontal: 52,
   },
   soonHint: {
     textAlign: "center",
