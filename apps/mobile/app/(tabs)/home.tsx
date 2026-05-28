@@ -21,6 +21,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -415,45 +416,49 @@ export default function HomeScreen() {
             const showChecklist = nearestEvent?.id === event.id;
             return (
               <View key={event.id} style={{ marginBottom: spacing.md }}>
-                <Card
+                <TouchableOpacity
+                  activeOpacity={0.7}
                   onPress={() => router.push(`/event/${event.id}`)}
-                  style={[
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      padding: spacing.lg,
-                      borderLeftWidth: 4,
-                      borderLeftColor: dotColor,
-                    },
-                    shadows.sm,
-                  ]}
                 >
-                  <View
-                    style={{
-                      marginRight: spacing.md,
-                      height: 44,
-                      width: 44,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: radii.full,
-                      backgroundColor,
-                    }}
+                  <Card
+                    style={[
+                      {
+                        flexDirection: "row",
+                        alignItems: "center",
+                        padding: spacing.lg,
+                        borderLeftWidth: 4,
+                        borderLeftColor: dotColor,
+                      },
+                      shadows.sm,
+                    ]}
                   >
-                    <Icon size={22} color={colors.textSecondary} strokeWidth={1.75} />
-                  </View>
-                  <View style={{ flex: 1, paddingRight: spacing.sm }}>
-                    <Text variant="h3" style={{ fontSize: 17 }}>
-                      {event.title}
-                    </Text>
-                    <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center" }}>
-                      <IconMapPin size={13} color={colors.textTertiary} />
-                      <Text variant="bodySmall" color={colors.textSecondary} style={{ marginLeft: 4 }}>
-                        {formatEventMeta(event.date, event.location)}
-                      </Text>
+                    <View
+                      style={{
+                        marginRight: spacing.md,
+                        height: 44,
+                        width: 44,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: radii.full,
+                        backgroundColor,
+                      }}
+                    >
+                      <Icon size={22} color={colors.textSecondary} strokeWidth={1.75} />
                     </View>
-                  </View>
-                  <Badge variant="primary" size="sm" label={getDaysRemainingLabel(event.date, t)} />
-                </Card>
+                    <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                      <Text variant="h3" style={{ fontSize: 17 }}>
+                        {event.title}
+                      </Text>
+                      <View style={{ marginTop: 4, flexDirection: "row", alignItems: "center" }}>
+                        <IconMapPin size={13} color={colors.textTertiary} />
+                        <Text variant="bodySmall" color={colors.textSecondary} style={{ marginLeft: 4 }}>
+                          {formatEventMeta(event.date, event.location)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Badge variant="primary" size="sm" label={getDaysRemainingLabel(event.date, t)} />
+                  </Card>
+                </TouchableOpacity>
                 {showChecklist ? renderChecklistPreview(event) : null}
               </View>
             );
