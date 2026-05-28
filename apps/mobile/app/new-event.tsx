@@ -6,9 +6,11 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -349,7 +351,7 @@ export default function NewEventScreen() {
           />
 
           <Card style={{ marginBottom: spacing.md }}>
-            <Pressable
+            <TouchableOpacity
               onPress={openDatePicker}
               style={{
                 flexDirection: "row",
@@ -367,8 +369,8 @@ export default function NewEventScreen() {
               <Text variant="bodySmall" color={colors.textTertiary}>
                 ›
               </Text>
-            </Pressable>
-            <Pressable
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={openTimePicker}
               style={{
                 flexDirection: "row",
@@ -386,32 +388,78 @@ export default function NewEventScreen() {
               <Text variant="bodySmall" color={colors.textTertiary}>
                 ›
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           </Card>
 
           {showDatePicker && (
-            <DateTimePicker
-              value={form.eventDate}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
-                if (Platform.OS === "android") setShowDatePicker(false);
-                if (event.type !== "dismissed" && selectedDate) updateForm("eventDate", selectedDate);
-              }}
-              minimumDate={new Date()}
-            />
+            <Modal transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.overlay,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <View
+                  style={{
+                    backgroundColor: colors.background,
+                    borderTopLeftRadius: radii.xl,
+                    borderTopRightRadius: radii.xl,
+                    paddingHorizontal: spacing.lg,
+                    paddingTop: spacing.md,
+                    paddingBottom: spacing.lg,
+                  }}
+                >
+                  <DateTimePicker
+                    value={form.eventDate}
+                    mode="date"
+                    display="spinner"
+                    minimumDate={new Date()}
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      if (event.type !== "dismissed" && selectedDate) {
+                        updateForm("eventDate", selectedDate);
+                      }
+                      if (event.type === "set" || event.type === "dismissed") setShowDatePicker(false);
+                    }}
+                  />
+                </View>
+              </View>
+            </Modal>
           )}
           {showTimePicker && (
-            <DateTimePicker
-              value={form.eventTime}
-              mode="time"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              is24Hour
-              onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
-                if (Platform.OS === "android") setShowTimePicker(false);
-                if (event.type !== "dismissed" && selectedTime) updateForm("eventTime", selectedTime);
-              }}
-            />
+            <Modal transparent animationType="slide" onRequestClose={() => setShowTimePicker(false)}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.overlay,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <View
+                  style={{
+                    backgroundColor: colors.background,
+                    borderTopLeftRadius: radii.xl,
+                    borderTopRightRadius: radii.xl,
+                    paddingHorizontal: spacing.lg,
+                    paddingTop: spacing.md,
+                    paddingBottom: spacing.lg,
+                  }}
+                >
+                  <DateTimePicker
+                    value={form.eventTime}
+                    mode="time"
+                    display="spinner"
+                    is24Hour
+                    onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                      if (event.type !== "dismissed" && selectedTime) {
+                        updateForm("eventTime", selectedTime);
+                      }
+                      if (event.type === "set" || event.type === "dismissed") setShowTimePicker(false);
+                    }}
+                  />
+                </View>
+              </View>
+            </Modal>
           )}
 
           <View style={{ marginBottom: spacing.md }}>
