@@ -6,7 +6,7 @@ import type { User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
 import { apiFetch } from "../lib/api";
 import { isProfileComplete } from "../lib/profile";
-import { getToken, getUser, saveUser } from "../lib/storage";
+import { clearAll, getToken, getUser, saveUser } from "../lib/storage";
 
 type ProfileResponse = { user: User };
 
@@ -35,6 +35,7 @@ export default function Index() {
         return;
       } catch (error) {
         if (error instanceof Error && error.message === "AUTH_SESSION_INVALID") {
+          await clearAll();
           setHref("/auth");
           return;
         }

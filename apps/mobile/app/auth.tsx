@@ -247,6 +247,12 @@ export default function AuthScreen() {
 
   async function completeAuth(authResponse: AuthResponse) {
     await saveToken(authResponse.token);
+    await saveUser({
+      id: authResponse.user.id,
+      email: authResponse.user.email,
+      name: authResponse.user.name ?? "",
+      surname: authResponse.user.surname ?? "",
+    });
     const localProfile = await getUser();
     let resolvedUser: User;
 
@@ -306,6 +312,9 @@ export default function AuthScreen() {
     try {
       setIsLoading(true);
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      await GoogleSignin.signOut().catch(() => {
+        // ignore - used only to force account picker
+      });
       const signInResult = await GoogleSignin.signIn();
       if (signInResult.type === "cancelled") return;
       const tokens = await GoogleSignin.getTokens();

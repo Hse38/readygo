@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -104,7 +104,7 @@ function toEditableProfile(user: User | null): EditableProfile {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
+  const localRouter = useRouter();
   const { colors, spacing, radii, shadows, isDark } = useTheme();
   const { locale, setLanguage, t } = useTranslation();
   const { isDark: isDarkMode, setDarkMode } = useDarkMode();
@@ -269,15 +269,15 @@ export default function ProfileScreen() {
   async function handleLogout() {
     console.log("[Profile] Logout requested");
     await clearAll();
-    console.log("[Profile] Storage cleared, redirecting to /auth");
+    console.log("[Profile] Storage cleared, redirecting to /auth with delay");
     await saveProfilePhoto(null);
-    router.replace("/auth");
+    setTimeout(() => router.replace("/auth"), 100);
   }
 
   async function handleLanguageChange(nextLocale: "tr" | "en") {
     if (nextLocale === locale) return;
     await setLanguage(nextLocale);
-    router.replace("/");
+    localRouter.replace("/");
   }
 
   function toggleWorkDay(value: string) {
