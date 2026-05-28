@@ -267,7 +267,9 @@ export default function ProfileScreen() {
   }
 
   async function handleLogout() {
+    console.log("[Profile] Logout requested");
     await clearAll();
+    console.log("[Profile] Storage cleared, redirecting to /auth");
     await saveProfilePhoto(null);
     router.replace("/auth");
   }

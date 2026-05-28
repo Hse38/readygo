@@ -2,6 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TOKEN_KEY = "token";
 const USER_KEY = "user";
+const PROFILE_PHOTO_KEY = "profile_photo_base64";
+const DARK_MODE_KEY = "darkMode";
+const LANGUAGE_KEY = "language";
+const LEGACY_LANGUAGE_KEY = "readygo_language";
 
 export async function saveToken(token: string): Promise<void> {
   await AsyncStorage.setItem(TOKEN_KEY, token);
@@ -30,6 +34,12 @@ export async function removeUser(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await removeToken();
-  await removeUser();
+  await AsyncStorage.multiRemove([
+    TOKEN_KEY,
+    USER_KEY,
+    PROFILE_PHOTO_KEY,
+    DARK_MODE_KEY,
+    LANGUAGE_KEY,
+    LEGACY_LANGUAGE_KEY,
+  ]);
 }
