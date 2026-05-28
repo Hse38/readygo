@@ -1,8 +1,6 @@
-import { EventType as PrismaEventType, type ChecklistItem, type Event, type Prisma } from "@prisma/client";
+import type { ChecklistItem, Event } from "@prisma/client";
 import type { Request, Response } from "express";
-import { processEvent } from "../core/engine/event.engine";
-import { detectEventType } from "../core/types/event.types";
-import { prisma } from "../lib/prisma";
+import { eventProcessingService } from "../services/event-processing.service";
 import type {
   ChecklistItemResponse,
   CreateEventBody,
@@ -11,7 +9,7 @@ import type {
   EventWithChecklist,
   EventsListResponse,
   UpdateChecklistItemBody,
-  UpdateChecklistItemResponse,
+  UpdateChecklistItemResponse
 } from "../types/events.types";
 
 type EventWithItems = Event & { checklistItems: ChecklistItem[] };
@@ -31,7 +29,7 @@ function toEventWithChecklist(event: EventWithItems): EventWithChecklist {
     id: event.id,
     userId: event.userId,
     title: event.title,
-    type: event.type,
+    type: String(event.type),
     date: event.date,
     location: event.location,
     locationLat: event.locationLat,
@@ -101,17 +99,6 @@ function validateCreateEventBody(body: unknown): CreateEventBody | null {
   };
 }
 
-function toPrismaEventType(value: string): PrismaEventType {
-  const detected = detectEventType(value);
-  return detected as unknown as PrismaEventType;
-}
-
-const eventInclude = {
-  checklistItems: {
-    orderBy: { scheduledAt: "asc" as const },
-  },
-} satisfies Prisma.EventInclude;
-
 export async function createEvent(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.id;
@@ -126,94 +113,21 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await eventProcessingService.getUserById(userId);
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
     const eventDate = new Date(body.date);
-
-    const eventType = toPrismaEventType(body.type);
-
-    const event = await prisma.event.create({
-      data: {
-        userId,
-        title: body.title,
-        type: eventType,
-        date: eventDate,
-        location: body.location ?? null,
-        locationLat: body.locationLat ?? null,
-        locationLng: body.locationLng ?? null,
-        travelMode: body.travelMode ?? null,
-      },
-    });
-
-    const intelligence = processEvent({
-      id: event.id,
-      userId: event.userId,
-      title: event.title,
-      type: detectEventType(event.type),
-      date: event.date,
-      location: event.location,
-      locationLat: event.locationLat,
-      locationLng: event.locationLng,
-      travelMode: event.travelMode,
-      metadata: null,
-    });
-
-    const checklistItems = await prisma.$transaction(async (tx) => {
-      if (intelligence.checklist.length > 0) {
-        await tx.checklistItem.createMany({
-          data: intelligence.checklist.map((item) => ({
-            eventId: event.id,
-            title: item.title,
-            scheduledAt: item.scheduledAt,
-            priority: item.priority,
-            source: item.source,
-          })),
-        });
-      }
-
-      if (intelligence.timeline.length > 0) {
-        await tx.timelineItem.createMany({
-          data: intelligence.timeline.map((item) => ({
-            eventId: event.id,
-            title: item.title,
-            scheduledAt: item.scheduledAt,
-            type: item.type,
-            priority: item.priority,
-          })),
-        });
-      }
-
-      if (intelligence.notifications.length > 0) {
-        await tx.notificationPlan.createMany({
-          data: intelligence.notifications.map((item) => ({
-            eventId: event.id,
-            title: item.title,
-            scheduledAt: item.scheduledAt,
-            priority: item.priority,
-          })),
-        });
-      }
-
-      await tx.event.update({
-        where: { id: event.id },
-        data: {
-          processedAt: intelligence.processedAt,
-          intelligenceVersion: intelligence.intelligenceVersion,
-          metadata: {
-            leaveHomeAt: intelligence.leaveHomeAt.toISOString(),
-            eventType: intelligence.eventType,
-          },
-        },
-      });
-
-      return tx.checklistItem.findMany({
-        where: { eventId: event.id },
-        orderBy: { scheduledAt: "asc" },
-      });
+    const { event, checklistItems } = await eventProcessingService.createAndProcessEvent(userId, {
+      title: body.title,
+      type: body.type,
+      date: eventDate,
+      location: body.location ?? null,
+      locationLat: body.locationLat ?? null,
+      locationLng: body.locationLng ?? null,
+      travelMode: body.travelMode ?? null,
     });
 
     const eventWithChecklist: EventWithItems = { ...event, checklistItems };
@@ -238,11 +152,7 @@ export async function getEvents(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const events = await prisma.event.findMany({
-      where: { userId },
-      orderBy: { date: "asc" },
-      include: eventInclude,
-    });
+    const events = await eventProcessingService.getEventsByUser(userId);
 
     const response: EventsListResponse = {
       events: events.map(toEventWithChecklist),
@@ -269,10 +179,7 @@ export async function getEventById(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const event = await prisma.event.findFirst({
-      where: { id, userId },
-      include: eventInclude,
-    });
+    const event = await eventProcessingService.getEventById(userId, id);
 
     if (!event) {
       res.status(404).json({ error: "Event not found" });
@@ -307,20 +214,14 @@ export async function getEventChecklist(
       return;
     }
 
-    const event = await prisma.event.findFirst({
-      where: { id, userId },
-      select: { id: true },
-    });
+    const event = await eventProcessingService.getEventById(userId, id);
 
     if (!event) {
       res.status(404).json({ error: "Event not found" });
       return;
     }
 
-    const checklistItems = await prisma.checklistItem.findMany({
-      where: { eventId: id },
-      orderBy: { scheduledAt: "asc" },
-    });
+    const checklistItems = await eventProcessingService.getChecklist(id);
 
     res.json({ checklistItems: checklistItems.map(toChecklistItem) });
   } catch (err) {
@@ -359,10 +260,7 @@ export async function updateChecklistItem(
       return;
     }
 
-    const existing = await prisma.checklistItem.findUnique({
-      where: { id: itemId },
-      include: { event: { select: { userId: true } } },
-    });
+    const existing = await eventProcessingService.getChecklistItem(itemId);
 
     if (!existing) {
       res.status(404).json({ error: "Checklist item not found" });
@@ -374,10 +272,7 @@ export async function updateChecklistItem(
       return;
     }
 
-    const item = await prisma.checklistItem.update({
-      where: { id: itemId },
-      data: { isCompleted: body.isCompleted },
-    });
+    const item = await eventProcessingService.updateChecklistItem(itemId, body.isCompleted);
 
     const response: UpdateChecklistItemResponse = {
       item: toChecklistItem(item),

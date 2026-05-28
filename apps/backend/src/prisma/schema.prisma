@@ -33,6 +33,20 @@ enum ChecklistItemSource {
   ai
 }
 
+enum EventProcessingState {
+  created
+  processing
+  processed
+  failed
+  archived
+}
+
+enum NotificationPriority {
+  critical
+  important
+  optional
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -65,6 +79,18 @@ model Event {
   locationLng        Float?
   travelMode         String?
   metadata           Json?
+  processingState    EventProcessingState @default(created)
+  processingError    String?
+  processingStartedAt DateTime?
+  processingFinishedAt DateTime?
+  retryCount         Int                 @default(0)
+  processingHash     String?
+  lastProcessedVersion String?
+  engineVersion      Int                 @default(1)
+  templateVersion    Int                 @default(1)
+  timelineVersion    Int                 @default(1)
+  notificationVersion Int                @default(1)
+  travelVersion      Int                 @default(1)
   processedAt        DateTime?
   intelligenceVersion Int      @default(1)
   createdAt          DateTime  @default(now())
@@ -73,6 +99,7 @@ model Event {
   checklistItems ChecklistItem[]
   timelineItems  TimelineItem[]
   notificationPlans NotificationPlan[]
+  processingLogs EventProcessingLog[]
   participants   Participant[]
 
   @@index([userId])
@@ -127,10 +154,27 @@ model NotificationPlan {
   eventId     String
   title       String
   scheduledAt DateTime
-  priority    ItemPriority @default(important)
+  priority    NotificationPriority @default(important)
   sentAt      DateTime?
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
+}
+
+model EventProcessingLog {
+  id          String   @id @default(cuid())
+  eventId     String
+  stage       String
+  status      String
+  startedAt   DateTime
+  finishedAt  DateTime?
+  durationMs  Int?
+  errorMessage String?
+  metadata    Json?
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([stage])
 }
