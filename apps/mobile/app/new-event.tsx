@@ -272,6 +272,213 @@ export default function NewEventScreen() {
     updateForm("type", type);
   }
 
+  function openDatePicker() {
+    setShowTimePicker(false);
+    setShowDatePicker(true);
+  }
+
+  function openTimePicker() {
+    setShowDatePicker(false);
+    setShowTimePicker(true);
+  }
+
+  function renderStepContent() {
+    if (step === 1) {
+      return (
+        <>
+          <Text variant="h2" style={{ marginBottom: spacing.lg }}>
+            {t("newEvent.typeTitle")}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+            {EVENT_TYPES.map((item) => (
+              <EventTypeCard
+                key={item.value}
+                item={item}
+                selected={selectedEventType === item.value}
+                onPress={() => selectEventType(item.value)}
+              />
+            ))}
+          </View>
+        </>
+      );
+    }
+
+    if (step === 2) {
+      return (
+        <>
+          <Text variant="h2" style={{ marginBottom: spacing.lg }}>
+            {t("newEvent.detailTitle")}
+          </Text>
+          <Input
+            label={t("newEvent.title")}
+            value={form.title}
+            onChangeText={(value) => updateForm("title", value)}
+            placeholder={placeholderConfig.titlePlaceholder}
+          />
+
+          <Card style={{ marginBottom: spacing.md }}>
+            <Pressable
+              onPress={openDatePicker}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingVertical: spacing.sm,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <IconCalendar size={18} color={colors.textSecondary} />
+                <Text variant="body" style={{ marginLeft: spacing.sm }}>
+                  {formatDate(form.eventDate)}
+                </Text>
+              </View>
+              <Text variant="bodySmall" color={colors.textTertiary}>
+                ›
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={openTimePicker}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingVertical: spacing.sm,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <IconClock size={18} color={colors.textSecondary} />
+                <Text variant="body" style={{ marginLeft: spacing.sm }}>
+                  {formatTime(form.eventTime)}
+                </Text>
+              </View>
+              <Text variant="bodySmall" color={colors.textTertiary}>
+                ›
+              </Text>
+            </Pressable>
+          </Card>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.eventDate}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                if (Platform.OS === "android") setShowDatePicker(false);
+                if (event.type !== "dismissed" && selectedDate) updateForm("eventDate", selectedDate);
+              }}
+              minimumDate={new Date()}
+            />
+          )}
+          {showTimePicker && (
+            <DateTimePicker
+              value={form.eventTime}
+              mode="time"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              is24Hour
+              onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
+                if (Platform.OS === "android") setShowTimePicker(false);
+                if (event.type !== "dismissed" && selectedTime) updateForm("eventTime", selectedTime);
+              }}
+            />
+          )}
+
+          <LocationInput
+            label={t("newEvent.location")}
+            value={form.location}
+            placeholder={placeholderConfig.locationPlaceholder}
+            onLocationSelect={({ address, lat, lng }) => {
+              updateForm("location", address);
+              updateForm("locationLat", address ? lat : null);
+              updateForm("locationLng", address ? lng : null);
+            }}
+          />
+
+          <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
+            {t("newEvent.transport")}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingRight: spacing.lg,
+              gap: spacing.sm,
+            }}
+          >
+            {TRANSPORT_MODES.map((mode) => {
+              const selected = form.travelMode === mode.value;
+              return (
+                <Pressable
+                  key={mode.value}
+                  onPress={() => updateForm("travelMode", mode.value)}
+                  style={{
+                    borderRadius: radii.full,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.primary : colors.border,
+                    backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.sm,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Text>{mode.icon}</Text>
+                  <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
+                    {mode.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </>
+      );
+    }
+
+    if (step === 3 && selectedTypeConfig) {
+      return (
+        <Card
+          style={{
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            ...shadows.sm,
+          }}
+        >
+          <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: radii.full,
+                backgroundColor: getTintedSurface(selectedTypeConfig.color, isDark, colors),
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 38 }}>{selectedTypeConfig.emoji}</Text>
+            </View>
+            <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
+              {selectedTypeConfig.label}
+            </Text>
+            <Text variant="h1" style={{ marginTop: spacing.xs, textAlign: "center" }}>
+              {form.title || "Etkinlik"}
+            </Text>
+          </View>
+          <DetailRow icon={<IconCalendar size={17} color={colors.textSecondary} />} label={formatDate(form.eventDate)} />
+          <DetailRow icon={<IconClock size={17} color={colors.textSecondary} />} label={formatTime(form.eventTime)} />
+          <DetailRow icon={<IconMapPin size={17} color={colors.textSecondary} />} label={form.location || "-"} />
+          <DetailRow
+            icon={<IconRoute size={17} color={colors.textSecondary} />}
+            label={selectedTransport?.label || "-"}
+          />
+        </Card>
+      );
+    }
+
+    return null;
+  }
+
   function validateStep(): boolean {
     if (step === 1 && !selectedEventType) {
       Alert.alert(t("common.missingInfo"), t("newEvent.chooseType"));
@@ -390,194 +597,7 @@ export default function NewEventScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>
-            {step === 1 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("newEvent.typeTitle")}
-                </Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-                  {EVENT_TYPES.map((item) => (
-                    <EventTypeCard
-                      key={item.value}
-                      item={item}
-                      selected={selectedEventType === item.value}
-                      onPress={() => selectEventType(item.value)}
-                    />
-                  ))}
-                </View>
-              </>
-            ) : null}
-
-            {step === 2 ? (
-              <>
-                <Text variant="h2" style={{ marginBottom: spacing.lg }}>
-                  {t("newEvent.detailTitle")}
-                </Text>
-                <Input
-                  label={t("newEvent.title")}
-                  value={form.title}
-                  onChangeText={(value) => updateForm("title", value)}
-                  placeholder={placeholderConfig.titlePlaceholder}
-                />
-
-                <Card style={{ marginBottom: spacing.md }}>
-                  <Pressable
-                    onPress={() => setShowDatePicker(true)}
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      paddingVertical: spacing.sm,
-                    }}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <IconCalendar size={18} color={colors.textSecondary} />
-                      <Text variant="body" style={{ marginLeft: spacing.sm }}>
-                        {formatDate(form.eventDate)}
-                      </Text>
-                    </View>
-                    <Text variant="bodySmall" color={colors.textTertiary}>
-                      ›
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setShowTimePicker(true)}
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      paddingVertical: spacing.sm,
-                    }}
-                  >
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <IconClock size={18} color={colors.textSecondary} />
-                      <Text variant="body" style={{ marginLeft: spacing.sm }}>
-                        {formatTime(form.eventTime)}
-                      </Text>
-                    </View>
-                    <Text variant="bodySmall" color={colors.textTertiary}>
-                      ›
-                    </Text>
-                  </Pressable>
-                </Card>
-
-                {showDatePicker ? (
-                  <DateTimePicker
-                    value={form.eventDate}
-                    mode="date"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
-                      if (Platform.OS === "android") setShowDatePicker(false);
-                      if (event.type !== "dismissed" && selectedDate) updateForm("eventDate", selectedDate);
-                    }}
-                    minimumDate={new Date()}
-                  />
-                ) : null}
-                {showTimePicker ? (
-                  <DateTimePicker
-                    value={form.eventTime}
-                    mode="time"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    is24Hour
-                    onChange={(event: DateTimePickerEvent, selectedTime?: Date) => {
-                      if (Platform.OS === "android") setShowTimePicker(false);
-                      if (event.type !== "dismissed" && selectedTime) updateForm("eventTime", selectedTime);
-                    }}
-                  />
-                ) : null}
-
-                <LocationInput
-                  label={t("newEvent.location")}
-                  value={form.location}
-                  placeholder={placeholderConfig.locationPlaceholder}
-                  onLocationSelect={({ address, lat, lng }) => {
-                    updateForm("location", address);
-                    updateForm("locationLat", address ? lat : null);
-                    updateForm("locationLng", address ? lng : null);
-                  }}
-                />
-
-                <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
-                  {t("newEvent.transport")}
-                </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingRight: spacing.lg,
-                    gap: spacing.sm,
-                  }}
-                >
-                  {TRANSPORT_MODES.map((mode) => {
-                    const selected = form.travelMode === mode.value;
-                    return (
-                      <Pressable
-                        key={mode.value}
-                        onPress={() => updateForm("travelMode", mode.value)}
-                        style={{
-                          borderRadius: radii.full,
-                          borderWidth: 1,
-                          borderColor: selected ? colors.primary : colors.border,
-                          backgroundColor: selected ? colors.backgroundTertiary : colors.surface,
-                          paddingHorizontal: spacing.md,
-                          paddingVertical: spacing.sm,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Text>{mode.icon}</Text>
-                        <Text variant="bodySmall" style={{ marginLeft: spacing.xs }}>
-                          {mode.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            ) : null}
-
-            {step === 3 && selectedTypeConfig ? (
-              <Card
-                style={{
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  ...shadows.sm,
-                }}
-              >
-                <View style={{ alignItems: "center", marginBottom: spacing.lg }}>
-                  <View
-                    style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: radii.full,
-                      backgroundColor: getTintedSurface(selectedTypeConfig.color, isDark, colors),
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 38 }}>{selectedTypeConfig.emoji}</Text>
-                  </View>
-                  <Text variant="caption" color={colors.textSecondary} style={{ marginTop: spacing.sm }}>
-                    {selectedTypeConfig.label}
-                  </Text>
-                  <Text variant="h1" style={{ marginTop: spacing.xs, textAlign: "center" }}>
-                    {form.title || "Etkinlik"}
-                  </Text>
-                </View>
-                <DetailRow icon={<IconCalendar size={17} color={colors.textSecondary} />} label={formatDate(form.eventDate)} />
-                <DetailRow icon={<IconClock size={17} color={colors.textSecondary} />} label={formatTime(form.eventTime)} />
-                <DetailRow icon={<IconMapPin size={17} color={colors.textSecondary} />} label={form.location || "-"} />
-                <DetailRow
-                  icon={<IconRoute size={17} color={colors.textSecondary} />}
-                  label={selectedTransport?.label || "-"}
-                />
-              </Card>
-            ) : null}
-            </Animated.View>
+            <Animated.View style={{ transform: [{ translateX: slideAnim }] }}>{renderStepContent()}</Animated.View>
           </ScrollView>
 
           <View
