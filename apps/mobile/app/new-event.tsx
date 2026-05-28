@@ -208,6 +208,25 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function getPlacesTypes(eventType: EventType | null): string[] {
+  switch (eventType) {
+    case "flight":
+      return ["airport"];
+    case "doctor":
+      return ["hospital", "health"];
+    case "concert":
+      return ["stadium", "establishment"];
+    case "exam":
+      return ["university", "school", "establishment"];
+    case "wedding":
+      return ["establishment"];
+    case "sport":
+      return ["gym", "stadium", "establishment"];
+    default:
+      return ["establishment", "geocode"];
+  }
+}
+
 export default function NewEventScreen() {
   const router = useRouter();
   const { colors, spacing, radii, shadows, isDark } = useTheme();
@@ -405,6 +424,7 @@ export default function NewEventScreen() {
               query={{
                 key: GOOGLE_PLACES_API_KEY,
                 language: "tr",
+                types: getPlacesTypes(selectedEventType).join("|"),
                 components: "country:tr",
               }}
               textInputProps={{
