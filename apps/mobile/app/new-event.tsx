@@ -16,13 +16,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
-import { LocationInput } from "../components/ui/LocationInput";
 import { Text } from "../components/ui/Text";
+import { GOOGLE_PLACES_API_KEY } from "../constants/config";
 import type { ChecklistItem, Event, User } from "../constants/types";
 import { useTheme } from "../hooks/useTheme";
 import { useTranslation } from "../lib/i18n";
 import { apiFetch } from "../lib/api";
 import { getTintedSurface } from "../lib/themeSurfaces";
+import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import {
   requestPermissions,
   scheduleChecklistNotifications,
@@ -220,6 +221,7 @@ export default function NewEventScreen() {
   const stepDirection = useRef<"forward" | "back">("forward");
 
   const [selectedEventType, setSelectedEventType] = useState<EventType | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
   const [form, setForm] = useState<FormData>({
     type: "",
     title: "",
@@ -243,6 +245,10 @@ export default function NewEventScreen() {
     }
     void loadDefaultTransport();
   }, []);
+
+  useEffect(() => {
+    setLocationQuery(form.location);
+  }, [form.location]);
 
   function updateForm<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -280,6 +286,13 @@ export default function NewEventScreen() {
   function openTimePicker() {
     setShowDatePicker(false);
     setShowTimePicker(true);
+  }
+
+  function handleLocationTextChange(text: string) {
+    setLocationQuery(text);
+    updateForm("location", text);
+    updateForm("locationLat", null);
+    updateForm("locationLng", null);
   }
 
   function renderStepContent() {
@@ -382,16 +395,81 @@ export default function NewEventScreen() {
             />
           )}
 
-          <LocationInput
-            label={t("newEvent.location")}
-            value={form.location}
-            placeholder={placeholderConfig.locationPlaceholder}
-            onLocationSelect={({ address, lat, lng }) => {
-              updateForm("location", address);
-              updateForm("locationLat", address ? lat : null);
-              updateForm("locationLng", address ? lng : null);
-            }}
-          />
+          <View style={{ marginBottom: spacing.md }}>
+            <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
+              {t("newEvent.location")}
+            </Text>
+            <GooglePlacesAutocomplete
+              placeholder={placeholderConfig.locationPlaceholder}
+              fetchDetails
+              query={{
+                key: GOOGLE_PLACES_API_KEY,
+                language: "tr",
+                components: "country:tr",
+              }}
+              textInputProps={{
+                value: locationQuery,
+                onChangeText: handleLocationTextChange,
+                onBlur: () => {
+                  const trimmed = locationQuery.trim();
+                  setLocationQuery(trimmed);
+                  updateForm("location", trimmed);
+                },
+                placeholderTextColor: colors.textTertiary,
+                selectionColor: colors.primary,
+                cursorColor: colors.primary,
+                underlineColorAndroid: "transparent",
+              }}
+              onPress={(data, details) => {
+                const address = data.description ?? "";
+                const lat = details?.geometry?.location?.lat ?? null;
+                const lng = details?.geometry?.location?.lng ?? null;
+                setLocationQuery(address);
+                updateForm("location", address);
+                updateForm("locationLat", lat);
+                updateForm("locationLng", lng);
+              }}
+              enablePoweredByContainer={false}
+              styles={{
+                container: { flex: 0 },
+                textInputContainer: {
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: radii.xl,
+                  backgroundColor: colors.surface,
+                  paddingHorizontal: spacing.sm,
+                },
+                textInput: {
+                  height: 52,
+                  color: colors.text,
+                  fontSize: 15,
+                  fontFamily: "Inter_400Regular",
+                  backgroundColor: colors.surface,
+                },
+                listView: {
+                  borderWidth: 1,
+                  borderColor: colors.borderLight,
+                  borderRadius: radii.lg,
+                  marginTop: 6,
+                  backgroundColor: colors.surfaceElevated,
+                },
+                row: {
+                  backgroundColor: colors.surfaceElevated,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.md,
+                },
+                separator: {
+                  height: 1,
+                  backgroundColor: colors.borderLight,
+                },
+                description: {
+                  color: colors.text,
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 13,
+                },
+              }}
+            />
+          </View>
 
           <Text variant="label" color={colors.textSecondary} style={{ marginBottom: spacing.sm }}>
             {t("newEvent.transport")}
