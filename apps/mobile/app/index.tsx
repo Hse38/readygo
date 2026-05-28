@@ -1,5 +1,5 @@
-import { Redirect } from "expo-router";
-import { useEffect, useState } from "react";
+import { Redirect, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import type { User } from "../constants/types";
@@ -18,8 +18,9 @@ export default function Index() {
   const { colors } = useTheme();
   const [href, setHref] = useState<string | null>(null);
 
-  useEffect(() => {
+  const checkToken = useCallback(() => {
     async function resolveRoute() {
+      setHref(null);
       const token = (await getToken())?.trim() ?? null;
 
       if (!token) {
@@ -47,9 +48,14 @@ export default function Index() {
         setHref("/onboarding");
       }
     }
-
     void resolveRoute();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkToken();
+    }, [checkToken])
+  );
 
   if (!href) {
     return (
